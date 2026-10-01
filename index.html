@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pachoncito | Pedidos Domingo</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-container">
+                <img src="1.png" alt="Pachoncito Logo" class="brand-logo">
+            </div>
+            <div class="badge">🏆 Premiado por TasteAtlas</div>
+        </header>
+
+        <!-- Contenedor del Formulario o Mensaje de Cierre -->
+        <div id="shopContainer">
+            <div id="closedNotice" style="display: none; text-align: center; padding: 40px 20px; background: #29231f; border-radius: 14px; border: 1px solid rgba(223, 155, 58, 0.3);">
+                <h3 style="color: #df9b3a; margin-bottom: 12px; font-size: 18px;">⏰ Pedidos Cerrados Temporalmente</h3>
+                <p id="closedMessage" style="color: #b0a595; font-size: 14px; line-height: 1.5;"></p>
+            </div>
+
+            <form id="orderForm">
+                <!-- Producto 1 -->
+                <div class="product-card">
+                    <div class="product-info">
+                        <h3>Clásico</h3>
+                        <span class="price">1.50 €</span>
+                    </div>
+                    <div class="counter">
+                        <button type="button" onclick="changeQty('clasico', -1)">-</button>
+                        <input type="number" id="clasico" value="0" min="0" readonly>
+                        <button type="button" onclick="changeQty('clasico', 1)">+</button>
+                    </div>
+                </div>
+
+                <!-- Producto 2 -->
+                <div class="product-card">
+                    <div class="product-info">
+                        <h3>Con Bocadillo (Guayaba)</h3>
+                        <span class="price">1.70 €</span>
+                    </div>
+                    <div class="counter">
+                        <button type="button" onclick="changeQty('bocadillo', -1)">-</button>
+                        <input type="number" id="bocadillo" value="0" min="0" readonly>
+                        <button type="button" onclick="changeQty('bocadillo', 1)">+</button>
+                    </div>
+                </div>
+
+                <!-- Alerta Dinámica de la Ñapa -->
+                <div id="napaAlert" class="alert-box">
+                    🎁 ¡Añade <span id="faltante">10.00</span>€ más para llevarte 1 ÑAPA gratis!
+                </div>
+
+                <!-- Datos de Entrega y Verificación Antifraude -->
+                <div class="section-delivery">
+                    <label for="nombre">Tu Nombre:</label>
+                    <input type="text" id="nombre" required placeholder="Ej: Marc V.">
+
+                    <label for="telefono">Teléfono de contacto (Para incidencias):</label>
+                    <input type="tel" id="telefono" required placeholder="Ej: 600123456" pattern="[0-9]{9}" title="Introduce un teléfono válido de 9 dígitos">
+
+                    <label for="tipoEntrega">Método:</label>
+                    <select id="tipoEntrega" onchange="toggleDireccion()">
+                        <option value="recogida">Recogida en local (Gratis)</option>
+                        <option value="domicilio">A domicilio en Premià (+1.00 €)</option>
+                    </select>
+
+                    <div id="direccionBox" style="display: none;">
+                        <label for="direccion">Dirección exacta:</label>
+                        <input type="text" id="direccion" placeholder="Calle, número, piso...">
+                    </div>
+
+                    <label for="hora">Hora de recogida/entrega (Dom):</label>
+                    <select id="hora" required>
+                        <option value="">Selecciona hora (06:00 a 19:00)...</option>
+                        <option value="06:00">06:00 - 07:00</option>
+                        <option value="07:00">07:00 - 08:00</option>
+                        <option value="08:00">08:00 - 09:00</option>
+                        <option value="09:00">09:00 - 10:00</option>
+                        <option value="10:00">10:00 - 11:00</option>
+                        <option value="11:00">11:00 - 12:00</option>
+                        <option value="12:00">12:00 - 13:00</option>
+                        <option value="13:00">13:00 - 14:00</option>
+                        <option value="14:00">14:00 - 15:00</option>
+                        <option value="15:00">15:00 - 16:00</option>
+                        <option value="16:00">16:00 - 17:00</option>
+                        <option value="17:00">17:00 - 18:00</option>
+                        <option value="18:00">18:00 - 19:00</option>
+                    </select>
+                </div>
+
+                <!-- Resumen y Botón -->
+                <div class="summary">
+                    <h3>Total: <span id="totalPrice">0.00</span> €</h3>
+                    <button type="submit" class="btn-primary">Reservar para este Domingo 🥖</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Script modular con Firebase y validaciones integradas -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCd0fYKBpOj5tVzE3S3yN71IbTvyPXsFZw",
+            authDomain: "pachoncito-pedidos.firebaseapp.com",
+            projectId: "pachoncito-pedidos",
+            storageBucket: "pachoncito-pedidos.firebasestorage.app",
+            messagingSenderId: "7692189366",
+            appId: "1:7692189366:web:6062b058010173d0f07017",
+            measurementId: "G-FEWQ71E7TF"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const prices = {
+            clasico: 1.50,
+            bocadillo: 1.70
+        };
+
+        function verificarHorarioApertura() {
+            const now = new Date();
+            const day = now.getDay(); // 0: Domingo, 6: Sábado
+            const hour = now.getHours();
+
+            const orderForm = document.getElementById('orderForm');
+            const closedNotice = document.getElementById('closedNotice');
+            const closedMessage = document.getElementById('closedMessage');
+
+            if ((day === 6 && hour >= 21) || day === 0) {
+                orderForm.style.display = 'none';
+                closedNotice.style.display = 'block';
+                closedMessage.innerHTML = '¡El plazo de reservas para este fin de semana ya se cerró el sábado a las 21:00 para realizar las compras en el mercado! 🛒<br><br><strong>Las reservas se reabrirán próximamente para el siguiente domingo.</strong> ¡Te esperamos!';
+            } else {
+                orderForm.style.display = 'block';
+                closedNotice.style.display = 'none';
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            verificarHorarioApertura();
+            
+            const savedName = localStorage.getItem('pachoncito_client_name');
+            const savedPhone = localStorage.getItem('pachoncito_client_phone');
+            
+            if (savedName) document.getElementById('nombre').value = savedName;
+            if (savedPhone) document.getElementById('telefono').value = savedPhone;
+
+            window.toggleDireccion();
+            updateSummary();
+        });
+
+        window.changeQty = function(product, delta) {
+            const input = document.getElementById(product);
+            let currentVal = parseInt(input.value) || 0;
+            currentVal += delta;
+            if (currentVal < 0) currentVal = 0;
+            input.value = currentVal;
+            updateSummary();
+        };
+
+        window.toggleDireccion = function() {
+            const tipoEntrega = document.getElementById('tipoEntrega').value;
+            const direccionBox = document.getElementById('direccionBox');
+            
+            if (tipoEntrega === 'domicilio') {
+                direccionBox.style.display = 'block';
+                direccionBox.style.opacity = '1';
+            } else {
+                direccionBox.style.display = 'none';
+            }
+            updateSummary();
+        };
+
+        function updateSummary() {
+            const clasicoQty = parseInt(document.getElementById('clasico').value) || 0;
+            const bocadilloQty = parseInt(document.getElementById('bocadillo').value) || 0;
+            
+            let subtotal = (clasicoQty * prices.clasico) + (bocadilloQty * prices.bocadillo);
+            const tipoEntrega = document.getElementById('tipoEntrega').value;
+            let deliveryCost = tipoEntrega === 'domicilio' ? 1.00 : 0.00;
+            
+            let total = subtotal + deliveryCost;
+            document.getElementById('totalPrice').innerText = total.toFixed(2);
+
+            const napaThreshold = 10.00;
+            const alertBox = document.getElementById('napaAlert');
+
+            if (subtotal >= napaThreshold) {
+                alertBox.style.borderColor = '#4ade80';
+                alertBox.style.color = '#4ade80';
+                alertBox.style.background = 'rgba(74, 222, 128, 0.08)';
+                alertBox.innerHTML = '🎉 ¡Felicidades! Te has ganado <strong>1 ÑAPA gratis</strong> 🥖✨';
+            } else {
+                alertBox.style.borderColor = 'rgba(223, 155, 58, 0.3)';
+                alertBox.style.color = '#df9b3a';
+                alertBox.style.background = 'rgba(223, 155, 58, 0.08)';
+                let faltante = (napaThreshold - subtotal).toFixed(2);
+                alertBox.innerHTML = `🎁 ¡Añade <span id="faltante">${faltante}</span>€ más para llevarte 1 ÑAPA gratis!`;
+            }
+        }
+
+        document.getElementById('orderForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const nombre = document.getElementById('nombre').value.trim();
+            const telefono = document.getElementById('telefono').value.trim();
+            const clasicoQty = parseInt(document.getElementById('clasico').value) || 0;
+            const bocadilloQty = parseInt(document.getElementById('bocadillo').value) || 0;
+            const tipoEntrega = document.getElementById('tipoEntrega').value;
+            const direccion = document.getElementById('direccion').value.trim();
+            const hora = document.getElementById('hora').value;
+            const subtotal = (clasicoQty * prices.clasico) + (bocadilloQty * prices.bocadillo);
+            const total = parseFloat(document.getElementById('totalPrice').innerText);
+
+            if (clasicoQty === 0 && bocadilloQty === 0) {
+                alert('Por favor, selecciona al menos un pandebono para tu pedido.');
+                return;
+            }
+
+            if (!/^[0-9]{9}$/.test(telefono)) {
+                alert('Por favor, introduce un número de teléfono móvil válido de 9 dígitos para verificar el pedido.');
+                return;
+            }
+
+            if (tipoEntrega === 'domicilio' && !direccion) {
+                alert('Por favor, introduce tu dirección exacta en Premià de Mar.');
+                return;
+            }
+
+            if (!hora) {
+                alert('Por favor, selecciona una franja horaria.');
+                return;
+            }
+
+            const submitBtn = document.querySelector('.btn-primary');
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Transmitiendo pedido... ⏳';
+
+            try {
+                const orderData = {
+                    customerName: nombre,
+                    phone: telefono,
+                    items: {
+                        clasico: clasicoQty,
+                        bocadillo: bocadilloQty
+                    },
+                    subtotal: subtotal,
+                    hasNapa: subtotal >= 10.00,
+                    deliveryMethod: tipoEntrega,
+                    address: tipoEntrega === 'domicilio' ? direccion : 'Recogida en local',
+                    deliverySlot: hora,
+                    total: total,
+                    status: 'pending',
+                    createdAt: serverTimestamp()
+                };
+
+                await addDoc(collection(db, "orders"), orderData);
+
+                localStorage.setItem('pachoncito_client_name', nombre);
+                localStorage.setItem('pachoncito_client_phone', telefono);
+
+                alert(`¡Pedido recibido con éxito, ${nombre}! 🥖🔥\n\nTe esperamos este domingo en @pachoncito_oficial.`);
+                
+                document.getElementById('clasico').value = 0;
+                document.getElementById('bocadillo').value = 0;
+                window.toggleDireccion();
+                updateSummary();
+
+            } catch (error) {
+                console.error("Error al guardar el pedido: ", error);
+                alert("Hubo un error al procesar tu reserva. Por favor, inténtalo de nuevo.");
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerText = 'Reservar para este Domingo 🥖';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,244 @@
+* { 
+    box-sizing: border-box; 
+    margin: 0; 
+    padding: 0; 
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, sans-serif; 
+    -webkit-font-smoothing: antialiased;
+}
+
+body { 
+    background-color: #151210; /* Café espresso oscuro muy cálido */
+    color: #f7f4ee; /* Crema suave marfil */
+    padding: 24px; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center;
+    min-height: 100vh;
+}
+
+.container { 
+    width: 100%; 
+    max-width: 460px; 
+    background: #211c18; /* Tono cacao artesanal profundo */
+    padding: 28px; 
+    border-radius: 20px; 
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.08); 
+    border: 1px solid rgba(223, 155, 58, 0.15); /* Sutil borde dorado cálido */
+    animation: scaleUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes scaleUp {
+    from { opacity: 0; transform: translateY(10px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+header { 
+    text-align: center; 
+    margin-bottom: 24px; 
+}
+
+.logo-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 12px;
+}
+
+.brand-logo {
+    width: 100%;
+    max-width: 210px;
+    height: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4));
+    transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.brand-logo:hover {
+    transform: scale(1.02);
+}
+
+.badge { 
+    display: inline-block; 
+    background: rgba(223, 155, 58, 0.12); 
+    color: #df9b3a; /* Dorado panadería artesanal */
+    font-size: 12px; 
+    padding: 6px 14px; 
+    border-radius: 20px; 
+    font-weight: 500; 
+    letter-spacing: 0.3px;
+    border: 1px solid rgba(223, 155, 58, 0.25);
+}
+
+/* Tarjetas de producto estilo Apple */
+.product-card { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    background: #29231f; 
+    padding: 16px; 
+    border-radius: 14px; 
+    margin-bottom: 12px; 
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.product-card:hover {
+    background: #332b26;
+    border-color: rgba(223, 155, 58, 0.25);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+
+.product-info h3 { 
+    font-size: 15px; 
+    font-weight: 500;
+    color: #f7f4ee; 
+    margin-bottom: 2px;
+}
+
+.price { 
+    font-size: 14px; 
+    color: #df9b3a; 
+    font-weight: 600; 
+}
+
+.counter { 
+    display: flex; 
+    align-items: center; 
+    gap: 8px; 
+    background: #1c1815;
+    padding: 4px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.counter button { 
+    background: #38302b; 
+    color: #f7f4ee; 
+    border: none; 
+    width: 30px; 
+    height: 30px; 
+    border-radius: 8px; 
+    font-size: 16px; 
+    font-weight: 500;
+    cursor: pointer; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, transform 0.1s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.counter button:hover {
+    background: #463c35;
+}
+
+.counter button:active { 
+    transform: scale(0.9);
+    background: #544840; 
+}
+
+.counter input { 
+    width: 36px; 
+    text-align: center; 
+    background: transparent; 
+    border: none; 
+    color: #f7f4ee; 
+    font-size: 15px; 
+    font-weight: 600; 
+}
+
+.alert-box { 
+    background: rgba(223, 155, 58, 0.08); 
+    border: 1px solid rgba(223, 155, 58, 0.3); 
+    color: #df9b3a; 
+    padding: 12px 14px; 
+    border-radius: 12px; 
+    text-align: center; 
+    font-size: 13px; 
+    margin-bottom: 18px; 
+    font-weight: 400;
+    letter-spacing: 0.2px;
+}
+
+.section-delivery { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 10px; 
+    margin-bottom: 20px; 
+}
+
+label { 
+    font-size: 11px; 
+    font-weight: 600;
+    color: #b0a595; 
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+input[type="text"], select { 
+    width: 100%; 
+    padding: 12px 14px; 
+    background: #29231f; 
+    border: 1px solid rgba(255, 255, 255, 0.08); 
+    color: #f7f4ee; 
+    border-radius: 10px; 
+    font-size: 14px; 
+    transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+    outline: none;
+}
+
+input[type="text"]:focus, select:focus { 
+    border-color: #df9b3a; 
+    box-shadow: 0 0 0 4px rgba(223, 155, 58, 0.15);
+    background: #302824;
+}
+
+/* Despliegue suave estilo Apple para la dirección */
+#direccionBox {
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.summary { 
+    border-top: 1px solid rgba(255, 255, 255, 0.08); 
+    padding-top: 18px; 
+    text-align: center; 
+}
+
+.summary h3 { 
+    font-size: 16px; 
+    margin-bottom: 14px; 
+    color: #b0a595; 
+    font-weight: 400;
+}
+
+.summary h3 span {
+    font-weight: 600;
+    color: #f7f4ee;
+    font-size: 18px;
+}
+
+.btn-primary { 
+    width: 100%; 
+    background: linear-gradient(135deg, #f0b14e 0%, #df9b3a 100%); 
+    color: #151210; 
+    border: none; 
+    padding: 15px; 
+    border-radius: 12px; 
+    font-size: 15px; 
+    font-weight: 600; 
+    cursor: pointer; 
+    letter-spacing: 0.3px;
+    box-shadow: 0 6px 20px rgba(223, 155, 58, 0.25);
+    transition: transform 0.15s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.btn-primary:hover {
+    filter: brightness(1.06);
+    box-shadow: 0 8px 24px rgba(223, 155, 58, 0.35);
+}
+
+.btn-primary:active { 
+    transform: scale(0.97); 
+    box-shadow: 0 3px 10px rgba(223, 155, 58, 0.2);
+}
