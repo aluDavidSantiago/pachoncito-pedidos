@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pachoncito | Panel de Control y Finanzas (Obrador)</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body { align-items: flex-start; padding: 20px; }
+        .admin-container { max-width: 900px; width: 100%; margin: 0 auto; }
+        .dashboard-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 16px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
+        .stat-card { background: #29231f; padding: 16px; border-radius: 14px; border: 1px solid rgba(223, 155, 58, 0.15); text-align: center; }
+        .stat-card h4 { font-size: 11px; color: #b0a595; text-transform: uppercase; margin-bottom: 6px; }
+        .stat-card .number { font-size: 22px; font-weight: 600; color: #df9b3a; }
+        .stat-card .number.profit { color: #4ade80; }
+        
+        .finance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+        @media (max-width: 768px) { .finance-grid { grid-template-columns: 1fr; } }
+        
+        .panel-box { background: #29231f; border-radius: 14px; padding: 20px; border: 1px solid rgba(223, 155, 58, 0.3); }
+        .panel-box h2 { font-size: 15px; color: #df9b3a; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .ingredients-list { display: flex; flex-direction: column; gap: 8px; }
+        .ingredient-item { background: #1f1a17; padding: 8px 12px; border-radius: 8px; font-size: 13px; color: #f7f4ee; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.04); }
+        .ingredient-item span { color: #df9b3a; font-weight: 600; }
+        .ingredient-item input { background: #38302b; color: #f7f4ee; border: 1px solid rgba(255,255,255,0.1); width: 60px; padding: 2px 6px; border-radius: 4px; text-align: right; }
+
+        .orders-list { display: flex; flex-direction: column; gap: 14px; }
+        .order-card { background: #29231f; border-radius: 14px; padding: 18px; border: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+        .order-info h3 { font-size: 16px; color: #f7f4ee; margin-bottom: 4px; }
+        .order-meta { font-size: 13px; color: #b0a595; line-height: 1.5; }
+        .order-meta strong { color: #f7f4ee; }
+        
+        .badge-status { padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; display: inline-block; }
+        .status-pending { background: rgba(223, 155, 58, 0.15); color: #df9b3a; border: 1px solid rgba(223, 155, 58, 0.3); }
+        .status-preparing { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .status-ready { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+        .status-completed { background: rgba(74, 222, 128, 0.15); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.3); }
+        .status-rejected { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+        .actions-bar { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+        .btn-status { background: #38302b; color: #f7f4ee; border: 1px solid rgba(255,255,255,0.08); padding: 5px 9px; border-radius: 8px; font-size: 11px; cursor: pointer; transition: background 0.2s; }
+        .btn-status:hover { background: #463c35; border-color: #df9b3a; }
+        .btn-danger { background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.4); }
+        .btn-danger:hover { background: rgba(239, 68, 68, 0.4); border-color: #f87171; }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <header class="dashboard-header">
+            <div class="logo-container" style="justify-content: flex-start; margin-bottom: 0;">
+                <img src="1.png" alt="Pachoncito Logo" class="brand-logo" style="max-width: 140px;">
+            </div>
+            <div class="badge">👨‍🍳 @pachoncito_oficial | Panel de Finanzas</div>
+        </header>
+
+        <!-- Resumen de Producción para el Domingo -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h4>Total Clásicos</h4>
+                <div class="number" id="totalClasicos">0</div>
+            </div>
+            <div class="stat-card">
+                <h4>Total con Bocadillo</h4>
+                <div class="number" id="totalBocadillo">0</div>
+            </div>
+            <div class="stat-card">
+                <h4>Ñapas a Regalar 🎁</h4>
+                <div class="number" id="totalNapas">0</div>
+            </div>
+            <div class="stat-card">
+                <h4>Inversión Estimada</h4>
+                <div class="number" id="totalInversion">0.00 €</div>
+            </div>
+            <div class="stat-card">
+                <h4>Beneficio Neto 💰</h4>
+                <div class="number profit" id="totalBeneficio">0.00 €</div>
+            </div>
+        </div>
+
+        <!-- Secciones de Compra y Precios Editables -->
+        <div class="finance-grid">
+            <div class="panel-box">
+                <h2>🛒 Lista de la Compra</h2>
+                <div class="ingredients-list" id="listaCompraBox">
+                    <!-- Se rellena dinámicamente -->
+                </div>
+            </div>
+
+            <div class="panel-box">
+                <h2>⚙️ Costes por Tanda (Modificables)</h2>
+                <div class="ingredients-list">
+                    <div class="ingredient-item">Almidón Goya (250g): <span><input type="number" id="costeYuca" value="1.50" step="0.05" onchange="recalcularTodo()"> €</span></div>
+                    <div class="ingredient-item">Maicena (60g): <span><input type="number" id="costeMaicena" value="0.35" step="0.05" onchange="recalcularTodo()"> €</span></div>
+                    <div class="ingredient-item">Mozzarella BonÀrea (280g): <span><input type="number" id="costeMozzarella" value="2.17" step="0.05" onchange="recalcularTodo()"> €</span></div>
+                    <div class="ingredient-item">Feta Koliós (220g): <span><input type="number" id="costeFeta" value="3.41" step="0.05" onchange="recalcularTodo()"> €</span></div>
+                    <div class="ingredient-item">Huevos, Azúcar, Sal, Leche: <span><input type="number" id="costeOtros" value="0.55" step="0.05" onchange="recalcularTodo()"> €</span></div>
+                    <div class="ingredient-item">Guayaba / Bocadillo: <span><input type="number" id="costeGuayaba" value="0.50" step="0.05" onchange="recalcularTodo()"> €</span></div>
+                    <div class="ingredient-item">Packaging, Bolsas y Luz: <span><input type="number" id="costeExtras" value="0.74" step="0.05" onchange="recalcularTodo()"> €</span></div>
+                </div>
+            </div>
+        </div>
+
+        <h2 style="font-size: 18px; margin-bottom: 14px; color: #f7f4ee; font-weight: 500;">Pedidos en Tiempo Real</h2>
+        
+        <div id="ordersContainer" class="orders-list">
+            <div style="text-align: center; color: #b0a595; padding: 40px;">Cargando pedidos del obrador... 🥖</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCd0fYKBpOj5tVzE3S3yN71IbTvyPXsFZw",
+            authDomain: "pachoncito-pedidos.firebaseapp.com",
+            projectId: "pachoncito-pedidos",
+            storageBucket: "pachoncito-pedidos.firebasestorage.app",
+            messagingSenderId: "7692189366",
+            appId: "1:7692189366:web:6062b058010173d0f07017",
+            measurementId: "G-FEWQ71E7TF"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const ordersContainer = document.getElementById('ordersContainer');
+        const elClasicos = document.getElementById('totalClasicos');
+        const elBocadillo = document.getElementById('totalBocadillo');
+        const elNapas = document.getElementById('totalNapas');
+        const elInversion = document.getElementById('totalInversion');
+        const elBeneficio = document.getElementById('totalBeneficio');
+        const listaCompraBox = document.getElementById('listaCompraBox');
+
+        let globalOrders = [];
+        let globalIngresos = 0;
+        let globalClasicos = 0;
+        let globalBocadillo = 0;
+
+        const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+
+        onSnapshot(q, (snapshot) => {
+            globalOrders = [];
+            globalClasicos = 0;
+            globalBocadillo = 0;
+            let sumNapas = 0;
+            globalIngresos = 0;
+
+            ordersContainer.innerHTML = '';
+
+            if (snapshot.empty) {
+                ordersContainer.innerHTML = '<div style="text-align: center; color: #b0a595; padding: 40px;">No hay pedidos registrados todavía para este domingo.</div>';
+                elClasicos.innerText = '0';
+                elBocadillo.innerText = '0';
+                elNapas.innerText = '0';
+                recalcularTodo();
+                return;
+            }
+
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.id ? { id: docSnap.id, ...docSnap.data() } : null;
+                if(data) {
+                    globalOrders.push(data);
+                    if (data.status !== 'rejected') {
+                        globalClasicos += data.items?.clasico || 0;
+                        globalBocadillo += data.items?.bocadillo || 0;
+                        if (data.hasNapa) sumNapas += 1;
+                        globalIngresos += data.total || 0;
+                    }
+                }
+            });
+
+            elClasicos.innerText = globalClasicos;
+            elBocadillo.innerText = globalBocadillo;
+            elNapas.innerText = sumNapas;
+
+            recalcularTodo();
+            renderOrders();
+        });
+
+        window.recalcularTodo = function() {
+            const totalPanes = globalClasicos + globalBocadillo;
+            if (totalPanes === 0) {
+                listaCompraBox.innerHTML = '<div class="ingredient-item"><span>Sin pedidos activos</span></div>';
+                elInversion.innerText = '0.00 €';
+                elBeneficio.innerText = '0.00 €';
+                return;
+            }
+
+            const tandas = Math.ceil(totalPanes / 16);
+
+            // Ingredientes
+            const bolsasYuca = Math.ceil((tandas * 250) / 1000);
+            const cajasMaicena = Math.ceil((tandas * 60) / 400);
+            const pksMozzarella = Math.ceil((tandas * 280) / 200);
+            const pksFeta = Math.ceil((tandas * 220) / 200);
+            const estuchesHuevos = Math.ceil((tandas * 2) / 12);
+            const bloquesGuayaba = globalBocadillo > 0 ? Math.ceil((globalBocadillo * 15) / 1000) : 0;
+
+            listaCompraBox.innerHTML = `
+                <div class="ingredient-item">Almidón Goya (1kg): <span>${bolsasYuca} bolsa(s)</span></div>
+                <div class="ingredient-item">Fécula Maicena (400g): <span>${cajasMaicena} caja(s)</span></div>
+                <div class="ingredient-item">Mozzarella BonÀrea (200g): <span>${pksMozzarella} pks</span></div>
+                <div class="ingredient-item">Feta Koliós (200g): <span>${pksFeta} pks</span></div>
+                <div class="ingredient-item">Huevos L (Estuche 12u): <span>${estuchesHuevos} estuche(s)</span></div>
+                <div class="ingredient-item">Pasta Guayaba (1kg): <span>${bloquesGuayaba} bloque(s)</span></div>
+                <div class="ingredient-item" style="border-top: 1px solid rgba(223,155,58,0.2); margin-top: 4px; paddingTop: 8px;">
+                    Tandas de producción (16u): <span>${tandas} tanda(s)</span>
+                </div>
+            `;
+
+            // Costes editados en los inputs
+            const cYuca = parseFloat(document.getElementById('costeYuca').value) || 0;
+            const cMaicena = parseFloat(document.getElementById('costeMaicena').value) || 0;
+            const cMozz = parseFloat(document.getElementById('costeMozzarella').value) || 0;
+            const cFeta = parseFloat(document.getElementById('costeFeta').value) || 0;
+            const cOtros = parseFloat(document.getElementById('costeOtros').value) || 0;
+            const cGuayaba = parseFloat(document.getElementById('costeGuayaba').value) || 0;
+            const cExtras = parseFloat(document.getElementById('costeExtras').value) || 0;
+
+            const costeTandaUnitaria = cYuca + cMaicena + cMozz + cFeta + cOtros + cGuayaba + cExtras;
+            const inversionTotal = tandas * costeTandaUnitaria;
+            const beneficioNeto = globalIngresos - inversionTotal;
+
+            elInversion.innerText = `${inversionTotal.toFixed(2)} €`;
+            elBeneficio.innerText = `${beneficioNeto.toFixed(2)} €`;
+        }
+
+        function renderOrders() {
+            ordersContainer.innerHTML = '';
+            globalOrders.forEach(order => {
+                const statusLabels = {
+                    'pending': { text: 'Pendiente', class: 'status-pending' },
+                    'preparing': { text: 'En preparación', class: 'status-preparing' },
+                    'ready': { text: 'Listo', class: 'status-ready' },
+                    'completed': { text: 'Entregado', class: 'status-completed' },
+                    'rejected': { text: 'Rechazado', class: 'status-rejected' }
+                };
+
+                const currentStatus = statusLabels[order.status] || statusLabels['pending'];
+
+                const card = document.createElement('div');
+                card.className = 'order-card';
+                card.innerHTML = `
+                    <div class="order-info" style="flex: 1;">
+                        <h3>${order.customerName} <span style="font-size: 12px; color: #df9b3a; font-weight: normal;">(📞 ${order.phone || 'Sin tel'})</span></h3>
+                        <div class="order-meta">
+                            🥖 <strong>Clásicos:</strong> ${order.items?.clasico || 0} | 🫓 <strong>Bocadillo:</strong> ${order.items?.bocadillo || 0}<br>
+                            📦 <strong>Método:</strong> ${order.deliveryMethod === 'domicilio' ? 'A domicilio (' + order.address + ')' : 'Recogida en local'}<br>
+                            ⏰ <strong>Hora:</strong> ${order.deliverySlot} | 💰 <strong>Total:</strong> ${(order.total || 0).toFixed(2)} € 
+                            ${order.hasNapa ? '<br><span style="color: #4ade80; font-weight: 600;">🎁 Incluye 1 Ñapa gratis</span>' : ''}
+                            ${order.status === 'rejected' ? '<br><span style="color: #f87171; font-weight: 600;">❌ Pedido rechazado por el obrador</span>' : ''}
+                        </div>
+                        <div class="actions-bar">
+                            <button class="btn-status" onclick="updateStatus('${order.id}', 'pending')">Pendiente</button>
+                            <button class="btn-status" onclick="updateStatus('${order.id}', 'preparing')">Preparando</button>
+                            <button class="btn-status" onclick="updateStatus('${order.id}', 'ready')">Listo</button>
+                            <button class="btn-status" onclick="updateStatus('${order.id}', 'completed')">Entregado</button>
+                            <button class="btn-status btn-danger" onclick="updateStatus('${order.id}', 'rejected')">Rechazar</button>
+                            <button class="btn-status btn-danger" onclick="deleteOrder('${order.id}')">🗑️️ Borrar</button>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="badge-status ${currentStatus.class}">${currentStatus.text}</span>
+                    </div>
+                `;
+                ordersContainer.appendChild(card);
+            });
+        }
+
+        window.updateStatus = async function(orderId, newStatus) {
+            try {
+                const orderRef = doc(db, "orders", orderId);
+                await updateDoc(orderRef, { status: newStatus });
+            } catch (error) {
+                console.error("Error al actualizar estado:", error);
+                alert("No se pudo actualizar el estado del pedido.");
+            }
+        };
+
+        window.deleteOrder = async function(orderId) {
+            if (confirm("¿Estás seguro de que quieres eliminar este pedido permanentemente?")) {
+                try {
+                    await deleteDoc(doc(db, "orders", orderId));
+                } catch (error) {
+                    console.error("Error al eliminar pedido:", error);
+                    alert("No se pudo eliminar el pedido.");
+                }
+            }
+        };
+    </script>
+</body>
+</html>
