@@ -7,8 +7,8 @@
 }
 
 body { 
-    background-color: #151210; /* Café espresso oscuro muy cálido */
-    color: #f7f4ee; /* Crema suave marfil */
+    background-color: #151210; 
+    color: #f7f4ee; 
     padding: 24px; 
     display: flex; 
     justify-content: center; 
@@ -19,11 +19,11 @@ body {
 .container { 
     width: 100%; 
     max-width: 460px; 
-    background: #211c18; /* Tono cacao artesanal profundo */
+    background: #211c18; 
     padding: 28px; 
     border-radius: 20px; 
     box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.08); 
-    border: 1px solid rgba(223, 155, 58, 0.15); /* Sutil borde dorado cálido */
+    border: 1px solid rgba(223, 155, 58, 0.15); 
     animation: scaleUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -46,7 +46,7 @@ header {
 
 .brand-logo {
     width: 100%;
-    max-width: 210px;
+    max-width: 300px;
     height: auto;
     object-fit: contain;
     filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4));
@@ -60,7 +60,7 @@ header {
 .badge { 
     display: inline-block; 
     background: rgba(223, 155, 58, 0.12); 
-    color: #df9b3a; /* Dorado panadería artesanal */
+    color: #df9b3a; 
     font-size: 12px; 
     padding: 6px 14px; 
     border-radius: 20px; 
@@ -69,7 +69,6 @@ header {
     border: 1px solid rgba(223, 155, 58, 0.25);
 }
 
-/* Tarjetas de producto estilo Apple */
 .product-card { 
     display: flex; 
     justify-content: space-between; 
@@ -138,13 +137,14 @@ header {
 }
 
 .counter input { 
-    width: 36px; 
+    width: 32px; 
     text-align: center; 
     background: transparent; 
     border: none; 
     color: #f7f4ee; 
     font-size: 15px; 
     font-weight: 600; 
+    outline: none;
 }
 
 .alert-box { 
@@ -175,7 +175,7 @@ label {
     text-transform: uppercase;
 }
 
-input[type="text"], select { 
+input[type="text"], input[type="tel"], select { 
     width: 100%; 
     padding: 12px 14px; 
     background: #29231f; 
@@ -187,13 +187,26 @@ input[type="text"], select {
     outline: none;
 }
 
-input[type="text"]:focus, select:focus { 
+input[type="text"]:focus, input[type="tel"]:focus, select:focus { 
     border-color: #df9b3a; 
     box-shadow: 0 0 0 4px rgba(223, 155, 58, 0.15);
     background: #302824;
 }
 
-/* Despliegue suave estilo Apple para la dirección */
+select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b0a595' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 16px;
+    padding-right: 40px;
+}
+
+select option {
+    background: #29231f;
+    color: #f7f4ee;
+}
+
 #direccionBox {
     overflow: hidden;
     transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
