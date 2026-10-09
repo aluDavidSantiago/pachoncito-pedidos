@@ -29,6 +29,17 @@
     margin: 0;
     padding: 0;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    /* BLOQUEO TOTAL DE ZOOM Y DOBLE TOQUE */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+    overflow-x: hidden;
 }
 
 body {
@@ -38,22 +49,38 @@ body {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    padding: 20px;
+    padding: 15px;
 }
 
 .container {
     width: 100%;
     max-width: 440px;
     background-color: var(--card-bg);
-    padding: 30px;
+    padding: 25px;
     border-radius: 16px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
     border: 1px solid var(--border-color);
 }
 
 header {
     text-align: center;
-    margin-bottom: 25px;
+    margin-bottom: 20px;
+}
+
+/* Estilos para el logo apaisado en sus proporciones naturales */
+.logo-container {
+    width: 100%;
+    max-width: 220px;
+    margin: 0 auto 10px auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.brand-logo {
+    width: 100%;
+    height: auto;
+    object-fit: contain;
 }
 
 .badge {
@@ -74,18 +101,13 @@ header {
 }
 
 h2 {
-    font-size: 1.4rem;
+    font-size: 1.35rem;
     font-weight: 700;
     color: var(--text-color);
 }
 
-h3 {
-    font-size: 1.1rem;
-    font-weight: 600;
-}
-
 .section-desc {
-    font-size: 0.88rem;
+    font-size: 0.86rem;
     color: var(--text-muted);
     line-height: 1.4;
 }
@@ -97,7 +119,7 @@ h3 {
 }
 
 label {
-    font-size: 0.88rem;
+    font-size: 0.85rem;
     font-weight: 500;
 }
 
@@ -139,13 +161,6 @@ input[type="tel"]:focus, input[type="text"]:focus {
     font-size: 0.9rem;
 }
 
-.tip-text {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    margin-top: 6px;
-    line-height: 1.3;
-}
-
 .btn-primary {
     width: 100%;
     padding: 12px;
@@ -153,7 +168,7 @@ input[type="tel"]:focus, input[type="text"]:focus {
     color: #fff;
     border: none;
     border-radius: 8px;
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 600;
     cursor: pointer;
     transition: background-color 0.2s, transform 0.1s;
@@ -175,7 +190,7 @@ input[type="tel"]:focus, input[type="text"]:focus {
     color: var(--text-muted);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     cursor: pointer;
     transition: all 0.2s;
     margin-top: 5px;
@@ -184,36 +199,4 @@ input[type="tel"]:focus, input[type="text"]:focus {
 .btn-secondary:hover {
     color: var(--text-color);
     border-color: var(--text-color);
-}
-
-.alert-box-success {
-    padding: 14px;
-    background-color: rgba(74, 222, 128, 0.08);
-    border: 1px solid var(--success-color);
-    color: var(--success-color);
-    border-radius: 8px;
-    font-size: 0.95rem;
-    text-align: center;
-    line-height: 1.4;
-}
-
-.info-card {
-    margin-top: 10px;
-    padding: 14px;
-    background-color: var(--input-bg);
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-}
-
-.info-card p {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    margin: 6px 0 10px 0;
-    line-height: 1.4;
-}
-
-.info-link {
-    color: var(--primary-color);
-    font-size: 0.85rem;
-    text-decoration: underline;
 }
