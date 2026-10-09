@@ -165,7 +165,11 @@
                     if (data.status !== 'rejected') {
                         globalClasicos += data.items?.clasico || 0;
                         globalBocadillo += data.items?.bocadillo || 0;
-                        if (data.hasNapa) sumNapas += 1;
+                        
+                        // CORRECCIÓN AQUÍ: Sumamos el total de ñapas reales (napaCount) en lugar de sumar solo 1 fijo
+                        const countThisOrderNapas = data.napaCount !== undefined ? data.napaCount : (data.hasNapa ? 1 : 0);
+                        sumNapas += countThisOrderNapas;
+
                         globalIngresos += data.total || 0;
                     }
                 }
@@ -240,6 +244,12 @@
 
                 const currentStatus = statusLabels[order.status] || statusLabels['pending'];
 
+                // CORRECCIÓN AQUÍ: Leemos el número real de ñapas para cada tarjeta de pedido individual
+                const napaCount = order.napaCount !== undefined ? order.napaCount : (order.hasNapa ? 1 : 0);
+                const napaTextHTML = napaCount > 0 
+                    ? `<br><span style="color: #4ade80; font-weight: 600;">🎁 Incluye ${napaCount} ${napaCount === 1 ? 'Ñapa gratis' : 'Ñapas gratis'}</span>` 
+                    : '';
+
                 const card = document.createElement('div');
                 card.className = 'order-card';
                 card.innerHTML = `
@@ -249,7 +259,7 @@
                             🥖 <strong>Clásicos:</strong> ${order.items?.clasico || 0} | 🫓 <strong>Bocadillo:</strong> ${order.items?.bocadillo || 0}<br>
                             📦 <strong>Método:</strong> ${order.deliveryMethod === 'domicilio' ? 'A domicilio (' + order.address + ')' : 'Recogida en local'}<br>
                             ⏰ <strong>Hora:</strong> ${order.deliverySlot} | 💰 <strong>Total:</strong> ${(order.total || 0).toFixed(2)} € 
-                            ${order.hasNapa ? '<br><span style="color: #4ade80; font-weight: 600;">🎁 Incluye 1 Ñapa gratis</span>' : ''}
+                            ${napaTextHTML}
                             ${order.status === 'rejected' ? '<br><span style="color: #f87171; font-weight: 600;">❌ Pedido rechazado por el obrador</span>' : ''}
                         </div>
                         <div class="actions-bar">
@@ -258,7 +268,7 @@
                             <button class="btn-status" onclick="updateStatus('${order.id}', 'ready')">Listo</button>
                             <button class="btn-status" onclick="updateStatus('${order.id}', 'completed')">Entregado</button>
                             <button class="btn-status btn-danger" onclick="updateStatus('${order.id}', 'rejected')">Rechazar</button>
-                            <button class="btn-status btn-danger" onclick="deleteOrder('${order.id}')">🗑️️ Borrar</button>
+                            <button class="btn-status btn-danger" onclick="deleteOrder('${order.id}')">🗑️ Borrar</button>
                         </div>
                     </div>
                     <div>

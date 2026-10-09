@@ -43,20 +43,22 @@ function updateSummary() {
     let total = subtotal + deliveryCost;
     document.getElementById('totalPrice').innerText = total.toFixed(2);
 
-    const napaThreshold = 10.00;
     const alertBox = document.getElementById('napaAlert');
 
-    if (subtotal >= napaThreshold) {
+    // MODIFICACIÓN: Las ñapas se calculan cada 10€ del total (incluyendo el envío)
+    const napaCount = Math.floor(total / 10);
+
+    if (napaCount > 0) {
         alertBox.style.borderColor = '#4ade80';
         alertBox.style.color = '#4ade80';
         alertBox.style.background = 'rgba(74, 222, 128, 0.08)';
-        alertBox.innerHTML = '🎉 ¡Felicidades! Te has ganado <strong>1 ÑAPA gratis</strong> 🥖✨';
+        alertBox.innerHTML = `🎉 ¡Felicidades! Te has ganado <strong>${napaCount} ${napaCount === 1 ? 'Ñapa gratis' : 'Ñapas gratis'}</strong> 🥖✨`;
     } else {
         alertBox.style.borderColor = 'rgba(223, 155, 58, 0.3)';
         alertBox.style.color = '#df9b3a';
         alertBox.style.background = 'rgba(223, 155, 58, 0.08)';
-        let faltante = (napaThreshold - subtotal).toFixed(2);
-        alertBox.innerHTML = `🎁 ¡Añade <span id="faltante">${faltante}</span>€ más para llevarte 1 ÑAPA gratis!`;
+        let faltante = (10.00 - total).toFixed(2);
+        alertBox.innerHTML = `🎁 ¡Añade <span id="faltante">${faltante}</span>€ más para llevarte tu primera Ñapa gratis!`;
     }
 }
 
@@ -86,13 +88,15 @@ document.getElementById('orderForm').addEventListener('submit', async function(e
     e.preventDefault();
     
     const nombre = document.getElementById('nombre').value.trim();
+    const telefono = document.getElementById('telefono').value.trim();
     const clasicoQty = parseInt(document.getElementById('clasico').value) || 0;
     const bocadilloQty = parseInt(document.getElementById('bocadillo').value) || 0;
     const tipoEntrega = document.getElementById('tipoEntrega').value;
     const direccion = document.getElementById('direccion').value.trim();
     const hora = document.getElementById('hora').value;
     const subtotal = (clasicoQty * prices.clasico) + (bocadilloQty * prices.bocadillo);
-    const total = parseFloat(document.getElementById('totalPrice').innerText);
+    const deliveryCost = tipoEntrega === 'domicilio' ? 1.00 : 0.00;
+    const total = subtotal + deliveryCost;
 
     if (clasicoQty === 0 && bocadilloQty === 0) {
         alert('Por favor, selecciona al menos un pandebono para tu pedido.');
@@ -105,7 +109,7 @@ document.getElementById('orderForm').addEventListener('submit', async function(e
     }
 
     if (!hora) {
-        alert('Por favor, selecciona una franja horaria.');
+        alert('Por favor, selecciona una hora de entrega.');
         return;
     }
 
@@ -114,14 +118,19 @@ document.getElementById('orderForm').addEventListener('submit', async function(e
     submitBtn.innerText = 'Guardando pedido... ⏳';
 
     try {
+        // MODIFICACIÓN: Se calcula el número de ñapas basado en el total (incluyendo envío)
+        const earnedNapas = Math.floor(total / 10);
+
         const orderData = {
             customerName: nombre,
+            phone: telefono,
             items: {
                 clasico: clasicoQty,
                 bocadillo: bocadilloQty
             },
             subtotal: subtotal,
-            hasNapa: subtotal >= 10.00,
+            hasNapa: earnedNapas > 0,
+            napaCount: earnedNapas, // Guardamos la cantidad exacta de ñapas ganadas
             deliveryMethod: tipoEntrega,
             address: tipoEntrega === 'domicilio' ? direccion : 'Recogida en local',
             deliverySlot: hora,

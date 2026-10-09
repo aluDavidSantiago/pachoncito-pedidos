@@ -2,6 +2,10 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <!-- Favicon para modo oscuro (se muestra si el navegador está en dark mode) -->
+    <link rel="icon" href="faviconB.png" media="(prefers-color-scheme: dark)">
+    <!-- Favicon para modo claro (se muestra si el navegador está en light mode) -->
+    <link rel="icon" href="faviconW.png" media="(prefers-color-scheme: light)">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pachoncito | Pedidos</title>
     <link rel="stylesheet" href="style.css">
@@ -22,7 +26,7 @@
             </div>
 
             <div class="section-delivery">
-                <label for="telefono">Telefono de Contacto</label>
+                <label for="telefono">Teléfono de Contacto</label>
                 <input type="tel" id="telefono" required placeholder="+34 600 000 000">
             </div>
 
@@ -50,36 +54,54 @@
                         <button type="button" onclick="changeQty('bocadillo', 1)">+</button>
                     </div>
                 </div>
+            </div>
 
             <div id="napaAlert" class="alert-box">
-                Añade mas productos para activar la bonificacion.
+                Añade más productos para activar la bonificación.
             </div>
 
             <div class="section-delivery">
-                <label for="tipoEntrega">Metodo de Entrega</label>
+                <label for="tipoEntrega">Método de Entrega</label>
                 <select id="tipoEntrega" onchange="toggleDireccion()">
                     <option value="recogida">Recogida en Obrador (Premià de Mar)</option>
-                    <option value="domicilio">Envio a Domicilio (+1.00 EUR)</option>
+                    <option value="domicilio">Envío a Domicilio (+1.00 EUR)</option>
                 </select>
             </div>
 
             <div class="section-delivery" id="direccionBox" style="display: none;">
-                <label for="direccion">Direccion de Entrega</label>
-                <input type="text" id="direccion" placeholder="Calle, numero, piso...">
+                <label for="direccion">Dirección de Entrega</label>
+                <input type="text" id="direccion" placeholder="Calle, número, piso...">
             </div>
 
             <div class="section-delivery">
-                <label for="hora">Franja Horaria</label>
+                <label for="hora">Hora de Entrega</label>
+                <!-- MODIFICACIÓN: Horas individuales de 30 en 30 minutos integradas tal como pediste -->
                 <select id="hora" required class="placeholder-select">
                     <option value="" disabled selected>Selecciona una franja horaria</option>
-                    <option value="06:00 - 07:30">06:00 - 07:30</option>
-                    <option value="07:30 - 09:00">07:30 - 09:00</option>
-                    <option value="09:00 - 10:30">09:00 - 10:30</option>
-                    <option value="10:30 - 12:00">10:30 - 12:00</option>
-                    <option value="12:00 - 13:30">12:00 - 13:30</option>
-                    <option value="13:30 - 15:00">13:30 - 15:00</option>
-                    <option value="15:00 - 16:30">15:00 - 16:30</option>
-                    <option value="16:30 - 18:00">16:30 - 18:00</option>
+                    <option value="06:00">06:00</option>
+                    <option value="06:30">06:30</option>
+                    <option value="07:00">07:00</option>
+                    <option value="07:30">07:30</option>
+                    <option value="08:00">08:00</option>
+                    <option value="08:30">08:30</option>
+                    <option value="09:00">09:00</option>
+                    <option value="09:30">09:30</option>
+                    <option value="10:00">10:00</option>
+                    <option value="10:30">10:30</option>
+                    <option value="11:00">11:00</option>
+                    <option value="11:30">11:30</option>
+                    <option value="12:00">12:00</option>
+                    <option value="12:30">12:30</option>
+                    <option value="13:00">13:00</option>
+                    <option value="13:30">13:30</option>
+                    <option value="14:00">14:00</option>
+                    <option value="14:30">14:30</option>
+                    <option value="15:00">15:00</option>
+                    <option value="15:30">15:30</option>
+                    <option value="16:00">16:00</option>
+                    <option value="16:30">16:30</option>
+                    <option value="17:00">17:00</option>
+                    <option value="17:30">17:30</option>
                 </select>
             </div>
 
@@ -88,6 +110,18 @@
                 <button type="submit" class="btn-primary">Reservar Pedido</button>
             </div>
         </form>
+
+        <!-- Footer / Redes Sociales -->
+        <footer class="site-footer">
+            <a href="https://www.instagram.com/pachoncito_oficial" target="_blank" rel="noopener noreferrer" class="instagram-link">
+                <svg class="instagram-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                </svg>
+                <span>@pachoncito_oficial</span>
+            </a>
+        </footer>
     </div>
 
     <script type="module" src="script.js"></script>
