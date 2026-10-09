@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <!-- Favicons dinámicos -->
+    <link rel="icon" href="faviconB.png" media="(prefers-color-scheme: dark)">
+    <link rel="icon" href="faviconW.png" media="(prefers-color-scheme: light)">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pachoncito | Mi Cuenta y Ñapas</title>
+    <link rel="stylesheet" href="style2.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <!-- Logo con tamaño forzado grande -->
+            <div style="width: 250px; height: 200px; margin: 0 auto 15px auto;">
+                <img src="1.png" alt="Pachoncito" style="width: 100%; height: 100%; object-fit: contain; border-radius: 50%;">
+            </div>
+            <div class="badge">Área Personal | Sistema de Ñapas</div>
+        </header>
+
+        <main>
+            <!-- PASO 1: Elegir si desea Registrarse o Iniciar Sesión -->
+            <section class="form-section" id="stepChoice">
+                <h2>Bienvenido a Pachoncito</h2>
+                <p class="section-desc">
+                    Accede a tu cuenta para ver tus ñapas o regístrate por primera vez en un segundo.
+                </p>
+                
+                <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 15px;">
+                    <button type="button" class="btn-primary" onclick="showRegisterForm()">📝 Registrarme por primera vez</button>
+                    <button type="button" class="btn-secondary" onclick="showLoginForm()" style="margin-top: 0;">🔑 Ya tengo cuenta (Iniciar sesión)</button>
+                </div>
+            </section>
+
+            <!-- PASO 1.A: Formulario de Registro Completo -->
+            <section class="form-section" id="stepRegister" style="display: none;">
+                <h2>Crear Cuenta Nueva</h2>
+                <p class="section-desc">Introduce tus datos para empezar a acumular ñapas.</p>
+                
+                <div class="form-group">
+                    <label for="regNames">Nombre(s)</label>
+                    <input type="text" id="regNames" placeholder="Ej. Santiago">
+                </div>
+
+                <div class="form-group">
+                    <label for="regSurnames">Apellido(s)</label>
+                    <input type="text" id="regSurnames" placeholder="Ej. Hernández">
+                </div>
+
+                <div class="form-group">
+                    <label for="regPhone">Teléfono Móvil</label>
+                    <input type="tel" id="regPhone" placeholder="+34 600 000 000">
+                </div>
+
+                <div class="form-group">
+                    <label for="regAddress">Dirección de Entrega</label>
+                    <input type="text" id="regAddress" placeholder="Calle, número, piso...">
+                </div>
+
+                <!-- Pregunta de recomendación -->
+                <div class="referral-box">
+                    <label style="font-weight: 600; font-size: 0.9rem;">¿Vienes recomendado por alguien?</label>
+                    <div class="radio-group" style="margin-top: 6px;">
+                        <label class="radio-label"><input type="radio" name="isReferenced" value="si" onclick="toggleRefInput(true)"> Sí</label>
+                        <label class="radio-label"><input type="radio" name="isReferenced" value="no" onclick="toggleRefInput(false)" checked> No</label>
+                    </div>
+
+                    <div id="refPhoneContainer" style="display: none; margin-top: 10px;">
+                        <label for="friendPhone" style="font-size: 0.85rem; opacity: 0.9;">Teléfono de tu recomendador:</label>
+                        <input type="tel" id="friendPhone" placeholder="Ej: 600000000">
+                        <p class="tip-text">Al introducir su número, le regalarás un pancito extra (ñapa) en su próximo pedido gracias a ti.</p>
+                    </div>
+                </div>
+
+                <!-- Configuración de Biometría / Llave de Acceso -->
+                <div style="padding: 12px; background: var(--input-bg); border-radius: 8px; border: 1px solid var(--border-color);">
+                    <label style="font-weight: 600; font-size: 0.9rem; display: block; margin-bottom: 6px;">Seguridad y Acceso Rápido</label>
+                    <p class="section-desc" style="margin-bottom: 8px;">¿Quieres usar datos biométricos (FaceID, Huella o Patrón) para entrar con un solo toque?</p>
+                    <div class="radio-group">
+                        <label class="radio-label"><input type="radio" name="useBiometrics" value="si" checked> Sí, activar</label>
+                        <label class="radio-label"><input type="radio" name="useBiometrics" value="no"> No, código SMS</label>
+                    </div>
+                </div>
+
+                <button type="button" class="btn-primary" onclick="completeRegistration()">Finalizar Registro 🥖</button>
+                <button type="button" class="btn-secondary" onclick="resetToChoice()">← Volver</button>
+            </section>
+
+            <!-- PASO 1.B: Formulario de Inicio de Sesión -->
+            <section class="form-section" id="stepLogin" style="display: none;">
+                <h2>Iniciar Sesión</h2>
+                <p class="section-desc">Introduce tu teléfono para entrar a tu área personal.</p>
+                
+                <div class="form-group">
+                    <label for="loginPhone">Teléfono de Contacto</label>
+                    <input type="tel" id="loginPhone" placeholder="+34 600 000 000">
+                </div>
+
+                <button type="button" class="btn-primary" onclick="processLogin()">Entrar a mi cuenta 🚀</button>
+                <button type="button" class="btn-secondary" onclick="resetToChoice()">← Volver</button>
+            </section>
+
+            <!-- PASO 2: Panel del Cliente (Una vez dentro) -->
+            <section class="form-section" id="userDashboard" style="display: none;">
+                <h2>¡Hola de nuevo, <span id="userNameDisplay">Cliente</span>! 👋</h2>
+                
+                <div class="alert-box-success">
+                    🎁 Tienes <strong id="userNapasCount">0</strong> Ñapas acumuladas listas para canjear este domingo.
+                </div>
+
+                <div class="info-card">
+                    <h3>¿Quieres conseguir más pancitos gratis?</h3>
+                    <p>Comparte tu número de teléfono con tus amigos. Cuando hagan su primer pedido y se entregue, ganarás una ñapa automática.</p>
+                    <a href="#" class="info-link" onclick="alert('Próximamente sección detallada de referidos.')">Clica aquí para saber cómo funciona</a>
+                </div>
+
+                <button type="button" class="btn-secondary" onclick="location.reload()">Cerrar sesión</button>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        function showRegisterForm() {
+            document.getElementById('stepChoice').style.display = 'none';
+            document.getElementById('stepRegister').style.display = 'flex';
+        }
+
+        function showLoginForm() {
+            document.getElementById('stepChoice').style.display = 'none';
+            document.getElementById('stepLogin').style.display = 'flex';
+        }
+
+        function resetToChoice() {
+            document.getElementById('stepRegister').style.display = 'none';
+            document.getElementById('stepLogin').style.display = 'none';
+            document.getElementById('stepChoice').style.display = 'flex';
+        }
+
+        function toggleRefInput(show) {
+            document.getElementById('refPhoneContainer').style.display = show ? 'block' : 'none';
+        }
+
+        function completeRegistration() {
+            const names = document.getElementById('regNames').value.trim();
+            const phone = document.getElementById('regPhone').value.trim();
+            if (!names || !phone) {
+                alert('Por favor, completa al menos tu nombre y tu teléfono.');
+                return;
+            }
+
+            document.getElementById('stepRegister').style.display = 'none';
+            document.getElementById('userNameDisplay').innerText = names;
+            document.getElementById('userNapasCount').innerText = "0";
+            document.getElementById('userDashboard').style.display = 'flex';
+        }
+
+        function processLogin() {
+            const phone = document.getElementById('loginPhone').value.trim();
+            if (!phone) {
+                alert('Por favor, introduce tu número de teléfono.');
+                return;
+            }
+
+            document.getElementById('stepLogin').style.display = 'none';
+            document.getElementById('userNameDisplay').innerText = "Santiago";
+            document.getElementById('userNapasCount').innerText = "2";
+            document.getElementById('userDashboard').style.display = 'flex';
+        }
+    </script>
+</body>
+</html>

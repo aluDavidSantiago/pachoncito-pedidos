@@ -1,0 +1,219 @@
+:root {
+    --bg-color: #121212;
+    --card-bg: #1e1e1e;
+    --text-color: #e0e0e0;
+    --text-muted: #a0a0a0;
+    --primary-color: #df9b3a;
+    --primary-hover: #f5b041;
+    --border-color: rgba(223, 155, 58, 0.3);
+    --input-bg: #2a2a2a;
+    --success-color: #4ade80;
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --bg-color: #f8f9fa;
+        --card-bg: #ffffff;
+        --text-color: #2c3e50;
+        --text-muted: #6c757d;
+        --primary-color: #c07b22;
+        --primary-hover: #df9b3a;
+        --border-color: rgba(192, 123, 34, 0.3);
+        --input-bg: #fdfbf7;
+        --success-color: #16a34a;
+    }
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.container {
+    width: 100%;
+    max-width: 440px;
+    background-color: var(--card-bg);
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--border-color);
+}
+
+header {
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.badge {
+    display: inline-block;
+    padding: 5px 12px;
+    background-color: var(--border-color);
+    color: var(--primary-color);
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.form-section {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+h2 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-color);
+}
+
+h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.section-desc {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+label {
+    font-size: 0.88rem;
+    font-weight: 500;
+}
+
+input[type="tel"], input[type="text"] {
+    width: 100%;
+    padding: 11px 13px;
+    background-color: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-color);
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+input[type="tel"]:focus, input[type="text"]:focus {
+    border-color: var(--primary-color);
+}
+
+.referral-box {
+    padding: 12px;
+    background-color: var(--input-bg);
+    border-radius: 8px;
+    border: 1px dashed var(--border-color);
+}
+
+.radio-group {
+    display: flex;
+    gap: 20px;
+    margin-top: 4px;
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-weight: normal;
+    font-size: 0.9rem;
+}
+
+.tip-text {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+    line-height: 1.3;
+}
+
+.btn-primary {
+    width: 100%;
+    padding: 12px;
+    background-color: var(--primary-color);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+    margin-top: 5px;
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-hover);
+}
+
+.btn-primary:active {
+    transform: scale(0.98);
+}
+
+.btn-secondary {
+    width: 100%;
+    padding: 10px;
+    background-color: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 5px;
+}
+
+.btn-secondary:hover {
+    color: var(--text-color);
+    border-color: var(--text-color);
+}
+
+.alert-box-success {
+    padding: 14px;
+    background-color: rgba(74, 222, 128, 0.08);
+    border: 1px solid var(--success-color);
+    color: var(--success-color);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    text-align: center;
+    line-height: 1.4;
+}
+
+.info-card {
+    margin-top: 10px;
+    padding: 14px;
+    background-color: var(--input-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.info-card p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: 6px 0 10px 0;
+    line-height: 1.4;
+}
+
+.info-link {
+    color: var(--primary-color);
+    font-size: 0.85rem;
+    text-decoration: underline;
+}

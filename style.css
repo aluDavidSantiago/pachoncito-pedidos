@@ -255,3 +255,50 @@ select option {
     transform: scale(0.97); 
     box-shadow: 0 3px 10px rgba(223, 155, 58, 0.2);
 }
+
+/* Estilos para el Footer de Instagram */
+.site-footer {
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.instagram-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: #29231f;
+    color: #f7f4ee;
+    padding: 10px 18px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+    width: 100%;
+    justify-content: center;
+}
+
+.instagram-link:hover {
+    background: #332b26;
+    border-color: rgba(223, 155, 58, 0.25);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+    color: #df9b3a;
+}
+
+.instagram-icon {
+    width: 18px;
+    height: 18px;
+    stroke: #df9b3a;
+    transition: transform 0.2s ease;
+}
+
+.instagram-link:hover .instagram-icon {
+    transform: scale(1.1);
+}
