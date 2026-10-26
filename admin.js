@@ -4,7 +4,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { auth } from "./auth.js";
-import { isTestPhone, mountEnvBanner, TEST_CUSTOMERS, TEST_OTP, USE_EMULATORS } from "./env.js";
+import { isTestPhone, mountEnvBanner, TEST_CUSTOMERS, TEST_OTP, TEST_PHONES_LABEL, USE_EMULATORS } from "./env.js";
 import { db } from "./firebase.js";
 import { completeOrder, normalizeOrder } from "./orders.js";
 import { clearTestData, seedTestData } from "./seeder.js";
@@ -410,7 +410,7 @@ $('testOtp').textContent = TEST_OTP;
 $('testTarget').textContent = USE_EMULATORS ? 'los emuladores locales' : 'la base de datos REAL (producción)';
 
 function confirmTarget(action) {
-    return USE_EMULATORS || confirm(`Vas a ${action} en la base de datos REAL de producción. Solo afecta a los teléfonos de prueba (+34 600 000 000–006). ¿Continuar?`);
+    return USE_EMULATORS || confirm(`Vas a ${action} en la base de datos REAL de producción. Solo afecta a los teléfonos de prueba (${TEST_PHONES_LABEL}). ¿Continuar?`);
 }
 
 function seedErrorMessage(error) {

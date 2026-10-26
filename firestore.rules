@@ -39,9 +39,9 @@ service cloud.firestore {
       return request.auth.token.phone_number;
     }
 
-    // Teléfonos ficticios de prueba (+34 600 000 000 a 006). Deben coincidir con TEST_PHONES de env.js.
+    // Teléfonos ficticios de prueba (+34 600 000 000 a 006 y +34 600 023 456). Deben coincidir con TEST_PHONES de env.js.
     function isTestPhone(phone) {
-      return isPhone(phone) && phone.matches('^[+]3460000000[0-6]$');
+      return isPhone(phone) && (phone.matches('^[+]3460000000[0-6]$') || phone == '+34600023456');
     }
 
     // ---------- Pedidos ----------
@@ -103,6 +103,11 @@ service cloud.firestore {
       return exists(path) && get(path).data.get('purchased', {}).get(product, 0) > 0;
     }
 
+    // Teléfono del autor de una reseña de prueba, leído del documento reviewAuthors que se crea en el mismo lote
+    function testAuthorPhone(reviewId) {
+      return getAfter(/databases/$(database)/documents/reviewAuthors/$(reviewId)).data.phone;
+    }
+
     function validReview(d) {
       return d.keys().hasAll(['product', 'ratings', 'comment', 'test', 'rewarded', 'createdAt'])
         && d.keys().hasOnly(['product', 'ratings', 'comment', 'test', 'rewarded', 'createdAt'])
@@ -138,6 +143,14 @@ service cloud.firestore {
         && validReview(request.resource.data)
         && request.resource.data.test == true
         && existsAfter(/databases/$(database)/documents/reviewAuthors/$(reviewId));
+      // Sesión de prueba sin SMS (resenas.js): solo teléfonos de prueba con compra entregada,
+      // id "test_<teléfono>_<producto>" (una por producto) y siempre marcada como prueba.
+      // Como mucho existe una por teléfono de prueba y producto, y el público no las ve.
+      allow create: if validReview(request.resource.data)
+        && request.resource.data.test == true
+        && isTestPhone(testAuthorPhone(reviewId))
+        && reviewId == 'test_' + testAuthorPhone(reviewId) + '_' + request.resource.data.product
+        && hasPurchased(testAuthorPhone(reviewId), request.resource.data.product);
       allow update: if isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rewarded']);
       allow delete: if isAdmin();
@@ -157,6 +170,12 @@ service cloud.firestore {
         && request.resource.data.keys().hasAll(['uid', 'phone', 'product'])
         && request.resource.data.keys().hasOnly(['uid', 'phone', 'product'])
         && isTestPhone(request.resource.data.phone)
+        && existsAfter(/databases/$(database)/documents/reviews/$(reviewId));
+      allow create: if request.resource.data.keys().hasAll(['uid', 'phone', 'product'])
+        && request.resource.data.keys().hasOnly(['uid', 'phone', 'product'])
+        && request.resource.data.uid == 'test'
+        && isTestPhone(request.resource.data.phone)
+        && reviewId == 'test_' + request.resource.data.phone + '_' + request.resource.data.product
         && existsAfter(/databases/$(database)/documents/reviews/$(reviewId));
       allow read, delete: if isAdmin();
     }

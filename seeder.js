@@ -7,7 +7,7 @@ import {
 import { TEST_CUSTOMERS, TEST_PHONES } from "./env.js";
 import { buildOrder, completeOrder } from "./orders.js";
 
-const [ana, bruno, carla, diego, elena, fran] = TEST_CUSTOMERS;
+const [ana, bruno, carla, diego, elena, fran, probador] = TEST_CUSTOMERS;
 
 // Orden importante: Ana debe estar entregada antes que Bruno para que su referido cuente
 export const SCENARIO = [
@@ -17,7 +17,9 @@ export const SCENARIO = [
     { customer: carla, items: { clasico: 0, bocadillo: 5 }, deliveryMethod: 'domicilio', address: 'Rambla de Mar 7, Premià de Mar', slot: '12:00', referralCode: bruno.phone, status: 'preparing' },
     { customer: diego, items: { clasico: 8, bocadillo: 0 }, deliveryMethod: 'recogida', slot: '08:00', status: 'ready' },
     { customer: elena, items: { clasico: 2, bocadillo: 1 }, deliveryMethod: 'recogida', slot: '13:30', referralCode: fran.phone, status: 'pending' },
-    { customer: fran, items: { clasico: 1, bocadillo: 0 }, deliveryMethod: 'recogida', slot: '17:00', status: 'rejected' }
+    { customer: fran, items: { clasico: 1, bocadillo: 0 }, deliveryMethod: 'recogida', slot: '17:00', status: 'rejected' },
+    // Compra entregada de ambos productos y sin reseñas: listo para probar las reseñas sin SMS
+    { customer: probador, items: { clasico: 3, bocadillo: 3 }, deliveryMethod: 'recogida', slot: '10:30', status: 'completed' }
 ];
 
 // Reseñas solo de Ana, que tiene compras de ambos productos.

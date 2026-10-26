@@ -51,7 +51,16 @@ Plataforma web desarrollada para la gestión, procesamiento y control de pedidos
 No hay ningún atajo que salte la autenticación en el navegador: Firestore exige un teléfono verificado por Firebase,
 así que se usan los mecanismos oficiales, que dan sesiones reales sin enviar SMS. Las reglas son las mismas en local y en producción.
 
-**Teléfonos de prueba** (definidos en `env.js` y en `firestore.rules`): `+34 600 000 000` a `+34 600 000 006`.
+**Teléfonos de prueba** (definidos en `env.js` y en `firestore.rules`): `+34 600 000 000` a `+34 600 000 006` y `+34 600 023 456`.
+
+### Reseñas sin SMS (no necesita configurar nada en Firebase)
+En `resenas.html`, si escribes un teléfono de prueba no se llama ni a reCAPTCHA ni a Firebase Auth: aparece el código
+`123456` ya rellenado y se abre una sesión de prueba. Las reglas solo aceptan esas reseñas si:
+* el teléfono es de prueba y tiene una compra entregada (genera antes los datos de prueba en el panel),
+* es la primera de ese teléfono para ese producto (id `test_<teléfono>_<producto>`),
+* va marcada como `test: true` (el público no la ve; sí con `?pruebas=1` y en el panel).
+
+Con `?pruebas=1`, un teléfono que no sea de prueba muestra un aviso en lugar de enviar un SMS real.
 
 ### Opción A: Firebase real (local o GitHub Pages)
 1. Firebase Console → *Authentication → Sign-in method → Teléfono → Números de teléfono para pruebas*:

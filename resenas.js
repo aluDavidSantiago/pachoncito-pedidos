@@ -3,7 +3,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { auth } from "./auth.js";
-import { isTestPhone, mountEnvBanner, TEST_MODE } from "./env.js";
+import { isTestPhone, mountEnvBanner, TEST_MODE, TEST_OTP, TEST_PHONES_LABEL } from "./env.js";
 import { db } from "./firebase.js";
 import { createPhoneLogin, phoneAuthErrorMessage } from "./phone-auth.js";
 import { el, formatDate, normalizePhone, PRODUCT_NAMES, RATING_ASPECTS, showMessage, starsText, storage, withBusy } from "./shared.js";
@@ -14,7 +14,10 @@ const phoneLogin = createPhoneLogin(auth, 'recaptcha-container');
 const $ = id => document.getElementById(id);
 const form = $('ratingForm');
 const message = $('reviewMessage');
-let currentUser = null;
+// Quien está valorando: una cuenta real verificada por SMS o una sesión de prueba sin SMS (solo teléfonos de prueba)
+let reviewer = null;
+let pendingTestPhone = null;
+const TEST_SESSION_KEY = 'pachoncito_test_reviewer';
 
 // ---------- Reseñas públicas (anónimas) ----------
 
@@ -102,6 +105,58 @@ function showStep(step) {
     form.hidden = step !== 'form';
 }
 
+// ---------- Identidad de quien valora ----------
+
+function realReviewer(user) {
+    return {
+        phone: user.phoneNumber,
+        test: isTestPhone(user.phoneNumber), // las reglas comprueban que coincide con el teléfono verificado
+        uid: user.uid,
+        reviewId: product => `${user.uid}_${product}`
+    };
+}
+
+// Sesión de prueba: no usa Firebase Auth ni reCAPTCHA. Las reglas solo la aceptan con teléfonos de prueba
+// que tengan una compra entregada, con id "test_<teléfono>_<producto>" y la reseña marcada como prueba.
+function testReviewer(phone) {
+    return {
+        phone,
+        test: true,
+        uid: 'test',
+        isTestSession: true,
+        reviewId: product => `test_${phone}_${product}`
+    };
+}
+
+function readTestSession() {
+    try {
+        const phone = sessionStorage.getItem(TEST_SESSION_KEY);
+        return isTestPhone(phone) ? phone : null;
+    } catch {
+        return null;
+    }
+}
+
+function writeTestSession(phone) {
+    try {
+        if (phone) sessionStorage.setItem(TEST_SESSION_KEY, phone);
+        else sessionStorage.removeItem(TEST_SESSION_KEY);
+    } catch { /* almacenamiento no disponible */ }
+}
+
+async function setReviewer(next) {
+    reviewer = next;
+    if (!reviewer) {
+        showStep('phone');
+        return;
+    }
+    $('signedInAs').textContent = reviewer.isTestSession
+        ? `🧪 Prueba sin SMS: ${reviewer.phone}`
+        : `Verificado: ${reviewer.phone}`;
+    showStep('form');
+    await markReviewedProducts();
+}
+
 // Desactiva los productos que este cliente ya ha valorado (1 reseña por producto)
 async function markReviewedProducts() {
     let pending = 0;
@@ -109,7 +164,7 @@ async function markReviewedProducts() {
         const input = form.querySelector(`input[name="product"][value="${product}"]`);
         let done = false;
         try {
-            done = (await getDoc(doc(db, 'reviews', `${currentUser.uid}_${product}`))).exists();
+            done = (await getDoc(doc(db, 'reviews', reviewer.reviewId(product)))).exists();
         } catch (error) {
             console.error('Error comprobando reseñas previas:', error);
         }
@@ -124,20 +179,39 @@ async function markReviewedProducts() {
 
 $('reviewPhone').value = storage.get('pachoncito_user')?.phone || '';
 
+function showCodeStep(code, text) {
+    showStep('code');
+    $('reviewCode').value = code || '';
+    showMessage(message, text, 'success');
+    $(code ? 'verifyCodeBtn' : 'reviewCode').focus();
+}
+
 $('sendCodeBtn').addEventListener('click', async event => {
     const phone = normalizePhone($('reviewPhone').value);
     if (!phone) {
         showMessage(message, 'Introduce un teléfono válido (9 cifras o formato +34…).', 'error');
         return;
     }
+
+    // Teléfono de prueba: ni reCAPTCHA ni SMS de Firebase
+    if (isTestPhone(phone)) {
+        pendingTestPhone = phone;
+        showCodeStep(TEST_OTP, `🧪 Número de prueba: no se envía SMS. Usa el código ${TEST_OTP} (ya rellenado).`);
+        return;
+    }
+
+    // En modo pruebas tampoco se envían SMS reales: solo valen los teléfonos de prueba
+    if (TEST_MODE) {
+        showMessage(message, `🧪 Modo pruebas: usa un teléfono de prueba (${TEST_PHONES_LABEL}) con el código ${TEST_OTP}. Para un SMS real, abre la página con ?pruebas=0.`, 'error');
+        return;
+    }
+
+    pendingTestPhone = null;
     try {
         const { suggestedCode } = await withBusy(event.currentTarget, 'Enviando SMS…', () => phoneLogin.send(phone));
-        showStep('code');
-        $('reviewCode').value = suggestedCode || '';
-        showMessage(message, suggestedCode
-            ? '🧪 Número de prueba: no se envía SMS y el código ya está rellenado.'
-            : 'Te hemos enviado un SMS con el código.', 'success');
-        $(suggestedCode ? 'verifyCodeBtn' : 'reviewCode').focus();
+        showCodeStep(suggestedCode, suggestedCode
+            ? '🧪 Emulador: no se envía SMS y el código ya está rellenado.'
+            : 'Te hemos enviado un SMS con el código.');
     } catch (error) {
         console.error('Error al enviar el SMS:', error);
         showMessage(message, phoneAuthErrorMessage(error), 'error');
@@ -150,6 +224,19 @@ $('verifyCodeBtn').addEventListener('click', async event => {
         showMessage(message, 'El código tiene 6 dígitos.', 'error');
         return;
     }
+
+    if (pendingTestPhone) {
+        if (code !== TEST_OTP) {
+            showMessage(message, `Código de prueba incorrecto: es ${TEST_OTP}.`, 'error');
+            return;
+        }
+        writeTestSession(pendingTestPhone);
+        showMessage(message, '');
+        await setReviewer(testReviewer(pendingTestPhone));
+        pendingTestPhone = null;
+        return;
+    }
+
     try {
         await withBusy(event.currentTarget, 'Verificando…', () => phoneLogin.confirm(code));
         showMessage(message, '');
@@ -159,27 +246,31 @@ $('verifyCodeBtn').addEventListener('click', async event => {
 });
 
 $('changePhoneBtn').addEventListener('click', () => {
+    pendingTestPhone = null;
     showMessage(message, '');
     showStep('phone');
 });
 
-$('signOutBtn').addEventListener('click', () => signOut(auth));
-
-onAuthStateChanged(auth, async user => {
-    // Solo sirven cuentas verificadas por SMS (no las del obrador)
-    currentUser = user?.phoneNumber ? user : null;
-    if (!currentUser) {
-        showStep('phone');
-        return;
+$('signOutBtn').addEventListener('click', () => {
+    showMessage(message, '');
+    if (reviewer?.isTestSession) {
+        writeTestSession(null);
+        setReviewer(null);
+    } else {
+        signOut(auth);
     }
-    $('signedInAs').textContent = `Verificado: ${currentUser.phoneNumber}`;
-    showStep('form');
-    await markReviewedProducts();
+});
+
+onAuthStateChanged(auth, user => {
+    // Una sesión de prueba activa tiene prioridad; si no, solo sirven cuentas verificadas por SMS (no las del obrador)
+    const testPhone = readTestSession();
+    if (testPhone) setReviewer(testReviewer(testPhone));
+    else setReviewer(user?.phoneNumber ? realReviewer(user) : null);
 });
 
 form.addEventListener('submit', async event => {
     event.preventDefault();
-    if (!currentUser) return showStep('phone');
+    if (!reviewer) return showStep('phone');
 
     const data = new FormData(form);
     const product = data.get('product');
@@ -192,26 +283,29 @@ form.addEventListener('submit', async event => {
     }
 
     // La reseña pública no lleva datos personales; el vínculo con el teléfono va aparte y es privado
-    const reviewId = `${currentUser.uid}_${product}`;
+    const reviewId = reviewer.reviewId(product);
     const batch = writeBatch(db);
     batch.set(doc(db, 'reviews', reviewId), {
         product, ratings, comment,
-        test: isTestPhone(currentUser.phoneNumber), // las reglas comprueban que coincide con el teléfono verificado
+        test: reviewer.test,
         rewarded: false,
         createdAt: serverTimestamp()
     });
-    batch.set(doc(db, 'reviewAuthors', reviewId), { uid: currentUser.uid, phone: currentUser.phoneNumber, product });
+    batch.set(doc(db, 'reviewAuthors', reviewId), { uid: reviewer.uid, phone: reviewer.phone, product });
 
     try {
         await withBusy($('submitReviewBtn'), 'Publicando…', () => batch.commit());
         form.reset();
         await markReviewedProducts();
-        showMessage(message, '¡Gracias por tu valoración! 🎁 Revisaremos tu reseña y te guardaremos una ñapa para tu próximo pedido.', 'success');
+        showMessage(message, reviewer.test
+            ? '🧪 Reseña de prueba publicada. Solo se ve en modo pruebas (?pruebas=1) y en el panel.'
+            : '¡Gracias por tu valoración! 🎁 Revisaremos tu reseña y te guardaremos una ñapa para tu próximo pedido.', 'success');
         loadReviews();
     } catch (error) {
         console.error('Error al publicar la reseña:', error);
+        const hint = reviewer.test ? ' ¿Has generado los datos de prueba en el panel y desplegado las reglas nuevas?' : '';
         showMessage(message, error.code === 'permission-denied'
-            ? 'No podemos publicarla: solo pueden valorar clientes con un pedido entregado de ese producto, y una sola vez por producto.'
+            ? `No podemos publicarla: solo pueden valorar clientes con un pedido entregado de ese producto, y una sola vez por producto.${hint}`
             : 'No se pudo publicar la valoración. Inténtalo de nuevo.', 'error');
     }
 });

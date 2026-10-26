@@ -1,5 +1,6 @@
 // Entorno de ejecución, emuladores y modo de pruebas.
-// IMPORTANTE: TEST_PHONES debe coincidir con isTestPhone() de firestore.rules (+34 600 000 000 a +34 600 000 006).
+// IMPORTANTE: TEST_PHONES debe coincidir con isTestPhone() de firestore.rules
+// (+34 600 000 000 a +34 600 000 006 y +34 600 023 456).
 import { el } from "./shared.js";
 
 const params = new URLSearchParams(location.search);
@@ -39,11 +40,13 @@ export const TEST_CUSTOMERS = [
     { phone: '+34600000003', name: 'Carla Prueba' },
     { phone: '+34600000004', name: 'Diego Prueba' },
     { phone: '+34600000005', name: 'Elena Prueba' },
-    { phone: '+34600000006', name: 'Fran Prueba' }
+    { phone: '+34600000006', name: 'Fran Prueba' },
+    { phone: '+34600023456', name: 'Probador Pachoncito' }
 ];
 
 // +34600000000 no lo usa el generador: queda libre para probar a mano como cliente nuevo
 export const TEST_PHONES = ['+34600000000', ...TEST_CUSTOMERS.map(customer => customer.phone)];
+export const TEST_PHONES_LABEL = '+34 600 000 000–006 o +34 600 023 456';
 
 export const isTestPhone = phone => TEST_PHONES.includes(phone);
 
@@ -53,6 +56,6 @@ export function mountEnvBanner() {
     document.body.classList.add('has-env-banner');
     document.body.prepend(el('div', { className: 'env-banner', role: 'note' },
         el('strong', { text: `🧪 Modo pruebas · ${target}` }),
-        ` · Teléfonos +34 600 000 000–006 · código ${TEST_OTP}`
+        ` · Teléfonos ${TEST_PHONES_LABEL} · código ${TEST_OTP}`
     ));
 }
