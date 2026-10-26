@@ -2,285 +2,115 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <!-- BLOQUEO ESTRICTO DE ZOOM: Impide totalmente la desconfiguración por doble toque -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    
-    <!-- Favicons dinámicos -->
+    <!-- Sin bloqueo de zoom: los campos usan 16px, así iOS ya no amplía al tocarlos -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#151210">
     <link rel="icon" href="faviconB.png" media="(prefers-color-scheme: dark)">
     <link rel="icon" href="faviconW.png" media="(prefers-color-scheme: light)">
     <title>Pachoncito | Mi Cuenta y Ñapas</title>
-    <link rel="stylesheet" href="style2.css">
-
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <header>
-            <!-- Logo apaisado original con proporciones perfectas -->
+        <header class="site-header">
             <div class="logo-container">
-                <img src="1.png" alt="Pachoncito" class="brand-logo">
+                <a href="index.html"><img src="1.png" alt="Pachoncito — volver a pedidos" class="brand-logo" width="300" height="73"></a>
             </div>
             <div class="badge">Área Personal | Sistema de Ñapas</div>
         </header>
 
         <main>
-            <!-- PASO 1: Selección de Registro o Inicio de Sesión -->
+            <!-- PASO 1: Registro o inicio de sesión -->
             <section class="form-section" id="stepChoice">
                 <h2>Bienvenido</h2>
-                <p class="section-desc">
-                    Accede a tu cuenta para gestionar tus ñapas o regístrate por primera vez.
-                </p>
-                
-                <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 15px;">
-                    <button type="button" class="btn-primary" onclick="showRegisterForm()">📝 Registrarme por primera vez</button>
-                    <button type="button" class="btn-secondary" onclick="showLoginForm()" style="margin-top: 0;">🔑 Ya tengo cuenta</button>
+                <p class="section-desc">Accede a tu cuenta para gestionar tus ñapas o regístrate por primera vez.</p>
+                <div class="btn-stack">
+                    <button type="button" class="btn btn-primary" data-step="stepRegister">📝 Registrarme por primera vez</button>
+                    <button type="button" class="btn btn-secondary" data-step="stepLogin">🔑 Ya tengo cuenta</button>
                 </div>
             </section>
 
-            <!-- PASO 1.A: Formulario de Registro -->
-            <section class="form-section" id="stepRegister" style="display: none;">
+            <!-- PASO 1.A: Registro -->
+            <section class="form-section" id="stepRegister" hidden>
                 <h2>Crear Cuenta Nueva</h2>
                 <p class="section-desc">Introduce tus datos para empezar a acumular ñapas.</p>
-                
-                <div class="form-group">
+
+                <div class="field">
                     <label for="regNames">Nombre(s)</label>
-                    <input type="text" id="regNames" placeholder="Tu nombre">
+                    <input type="text" id="regNames" autocomplete="given-name" maxlength="40" placeholder="Tu nombre">
                 </div>
-
-                <div class="form-group">
+                <div class="field">
                     <label for="regSurnames">Apellido(s)</label>
-                    <input type="text" id="regSurnames" placeholder="Tus apellidos">
+                    <input type="text" id="regSurnames" autocomplete="family-name" maxlength="40" placeholder="Tus apellidos">
                 </div>
-
-                <div class="form-group">
+                <div class="field">
                     <label for="regPhone">Teléfono Móvil</label>
-                    <input type="tel" id="regPhone" placeholder="600000000">
+                    <input type="tel" id="regPhone" inputmode="tel" autocomplete="tel" placeholder="600 000 000">
                 </div>
-
-                <div class="form-group">
+                <div class="field">
                     <label for="regAddress">Dirección de Entrega</label>
-                    <input type="text" id="regAddress" placeholder="Calle, número, piso...">
+                    <input type="text" id="regAddress" autocomplete="street-address" maxlength="200" placeholder="Calle, número, piso...">
                 </div>
 
-                <!-- Pregunta de recomendación con enlace integrado para ganar pancitos -->
-                <div class="referral-box">
-                    <label style="font-weight: 600; font-size: 0.9rem;">¿Vienes recomendado por alguien?</label>
-                    <div class="radio-group" style="margin-top: 6px;">
-                        <label class="radio-label"><input type="radio" name="isReferenced" value="si" onclick="toggleRefInput(true)"> Sí</label>
-                        <label class="radio-label"><input type="radio" name="isReferenced" value="no" onclick="toggleRefInput(false)" checked> No</label>
-                    </div>
-
-                    <div id="refPhoneContainer" style="display: none; margin-top: 10px;">
-                        <label for="friendPhone" style="font-size: 0.85rem; opacity: 0.9;">Teléfono de tu recomendador:</label>
-                        <input type="tel" id="friendPhone" placeholder="600000000">
-                    </div>
-
-                    <!-- Enlace directo y natural dentro del apartado -->
-                    <div style="margin-top: 12px; border-top: 1px dashed var(--border-color); padding-top: 8px;">
-                        <a href="javascript:void(0);" onclick="toggleInfoModal(true)" style="color: var(--primary-color); font-size: 0.85rem; text-decoration: none; font-weight: 600;">
-                            ✨ ¿Te interesa saber cómo puedes ganar más pancitos tú también? Pincha aquí
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Configuración de Biometría -->
-                <div style="padding: 12px; background: var(--input-bg); border-radius: 8px; border: 1px solid var(--border-color);">
-                    <label style="font-weight: 600; font-size: 0.9rem; display: block; margin-bottom: 6px;">Seguridad y Acceso Rápido</label>
-                    <p class="section-desc" style="margin-bottom: 8px;">¿Deseas activar el inicio de sesión biométrico (FaceID / Huella) en este dispositivo?</p>
+                <div class="panel-soft">
+                    <span class="label">¿Vienes recomendado por alguien?</span>
                     <div class="radio-group">
-                        <label class="radio-label"><input type="radio" name="useBiometrics" value="si" checked> Sí</label>
-                        <label class="radio-label"><input type="radio" name="useBiometrics" value="no"> No</label>
+                        <label class="choice"><input type="radio" name="isReferenced" value="si"> Sí</label>
+                        <label class="choice"><input type="radio" name="isReferenced" value="no" checked> No</label>
                     </div>
+                    <div id="refPhoneContainer" class="field field-reveal" hidden>
+                        <label for="friendPhone">Teléfono de tu recomendador</label>
+                        <input type="tel" id="friendPhone" inputmode="tel" autocomplete="off" placeholder="600 000 000">
+                    </div>
+                    <button type="button" id="infoBtn" class="btn btn-link">✨ ¿Cómo puedes ganar más pancitos tú también? Pincha aquí</button>
                 </div>
 
-                <button type="button" class="btn-primary" onclick="startRegistrationSMS()">Finalizar y Verificar SMS 🥖</button>
-                <button type="button" class="btn-secondary" onclick="resetToChoice()">← Volver</button>
+                <button type="button" id="registerBtn" class="btn btn-primary">Finalizar y Verificar SMS 🥖</button>
+                <button type="button" class="btn btn-secondary" data-step="stepChoice">← Volver</button>
             </section>
 
-            <!-- PASO 1.B: Formulario de Inicio de Sesión -->
-            <section class="form-section" id="stepLogin" style="display: none;">
+            <!-- PASO 1.B: Inicio de sesión -->
+            <section class="form-section" id="stepLogin" hidden>
                 <h2>Iniciar Sesión</h2>
                 <p class="section-desc">Introduce tu teléfono móvil para acceder.</p>
-                
-                <div class="form-group">
+                <div class="field">
                     <label for="loginPhone">Teléfono de Contacto</label>
-                    <input type="tel" id="loginPhone" placeholder="600000000">
+                    <input type="tel" id="loginPhone" inputmode="tel" autocomplete="tel" placeholder="600 000 000">
                 </div>
-
-                <button type="button" class="btn-primary" onclick="startLoginSMS()">Enviar Código SMS 🚀</button>
-                <button type="button" class="btn-secondary" onclick="resetToChoice()">← Volver</button>
+                <button type="button" id="loginBtn" class="btn btn-primary">Enviar Código SMS 🚀</button>
+                <button type="button" class="btn btn-secondary" data-step="stepChoice">← Volver</button>
             </section>
 
-            <!-- PASO 2: Verificación de Código SMS -->
-            <section class="form-section" id="stepVerify" style="display: none;">
+            <!-- PASO 2: Código SMS -->
+            <section class="form-section" id="stepVerify" hidden>
                 <h2>Verificación por SMS</h2>
                 <p class="section-desc">Introduce el código de 6 dígitos recibido en tu móvil.</p>
-                
-                <div class="form-group">
+                <div class="field">
                     <label for="smsCode">Código de Verificación</label>
-                    <input type="text" id="smsCode" placeholder="123456" maxlength="6" style="text-align: center; font-size: 1.2rem; letter-spacing: 4px;">
+                    <input type="text" id="smsCode" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">
                 </div>
-
-                <button type="button" class="btn-primary" onclick="verifySMSCode()">Verificar y Entrar 🥖</button>
-                <button type="button" class="btn-secondary" onclick="resetToChoice()">← Cancelar</button>
+                <button type="button" id="verifyBtn" class="btn btn-primary">Verificar y Entrar 🥖</button>
+                <button type="button" class="btn btn-secondary" data-step="stepChoice">← Cancelar</button>
             </section>
+
+            <p id="accessMessage" class="form-message" role="status" aria-live="polite" hidden></p>
         </main>
-        
-        <!-- Modal Informativo de Pancitos y Ñapas -->
-        <div id="infoModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; padding: 20px;">
-            <div style="background: var(--card-bg); width: 100%; max-width: 400px; padding: 25px; border-radius: 16px; border: 1px solid var(--border-color); max-height: 90vh; overflow-y: auto;">
-                <h3 style="color: var(--primary-color); font-size: 1.3rem; margin-bottom: 10px; text-align: center;">🥖 ¿Cómo ganar más Pancitos gratis?</h3>
-                <p class="section-desc" style="text-align: center; margin-bottom: 20px;">Disfrutar de los mejores pandebonos tiene premio doble:</p>
-                
-                <div style="display: flex; flex-direction: column; gap: 15px; font-size: 0.9rem; line-height: 1.4;">
-                    <div style="background: var(--input-bg); padding: 12px; border-radius: 8px; border-left: 4px solid var(--primary-color);">
-                        <strong>1️⃣ Tu número es tu llave</strong><br>
-                        Tu teléfono registrado es tu código personal para compartir.
-                    </div>
-                    <div style="background: var(--input-bg); padding: 12px; border-radius: 8px; border-left: 4px solid var(--primary-color);">
-                        <strong>2️⃣ Pásaselo a tus compis</strong><br>
-                        Diles que, al registrarse, pongan <strong>tu número de teléfono</strong> en la casilla de recomendación.
-                    </div>
-                    <div style="background: var(--input-bg); padding: 12px; border-radius: 8px; border-left: 4px solid var(--primary-color);">
-                        <strong>3️⃣ ¡Ñapa automática!</strong><br>
-                        Ellos se llevan su bienvenida y <strong>tú ganas una ñapa gratis</strong> para tu siguiente pedido dominical. ¡Sin límites! 🔥
-                    </div>
-                </div>
 
-                <button type="button" class="btn-primary" onclick="toggleInfoModal(false)" style="margin-top: 20px;">¡Entendido! 🚀</button>
-            </div>
-        </div>
+        <!-- Cómo ganar ñapas -->
+        <dialog id="infoModal" class="modal" aria-labelledby="infoTitle">
+            <h3 id="infoTitle">🥖 ¿Cómo ganar más Pancitos gratis?</h3>
+            <p class="section-desc">Disfrutar de los mejores pandebonos tiene premio doble:</p>
+            <ol class="info-list">
+                <li><strong>1️⃣ Tu número es tu código</strong><br>Tu teléfono registrado es tu código de referido personal.</li>
+                <li><strong>2️⃣ Pásaselo a tus compis</strong><br>Diles que, en su primer pedido, pongan <strong>tu número de teléfono</strong> en «Código de referido».</li>
+                <li><strong>3️⃣ ¡Ñapa automática!</strong><br>Cuando les entreguemos ese primer pedido, <strong>tú ganas una ñapa gratis</strong> para tu siguiente pedido dominical. ¡Sin límites! 🔥</li>
+            </ol>
+            <button type="button" id="closeInfoBtn" class="btn btn-primary">¡Entendido! 🚀</button>
+        </dialog>
 
-        <!-- Contenedor invisible para reCAPTCHA -->
         <div id="recaptcha-container"></div>
     </div>
 
-    <script>
-        const firebaseConfig = {
-            apiKey: "AiySyCd0fYKBpOj5tVzE3S3YN71IbTvyPXsFZw",
-            authDomain: "pachoncito-pedidos.firebaseapp.com",
-            projectId: "pachoncito-pedidos",
-            storageBucket: "pachoncito-pedidos.appspot.com",
-            messagingSenderId: "7692189366",
-            appId: "1:7692189366:web:6062b058010173d0f07017",
-            measurementId: "G-FEMQ71E7TF"
-        };
-
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-
-        let confirmationResultGlobal = null;
-        let pendingUserData = null;
-
-        function showRegisterForm() {
-            document.getElementById('stepChoice').style.display = 'none';
-            document.getElementById('stepRegister').style.display = 'flex';
-        }
-
-        function showLoginForm() {
-            document.getElementById('stepChoice').style.display = 'none';
-            document.getElementById('stepLogin').style.display = 'flex';
-        }
-
-        function resetToChoice() {
-            document.getElementById('stepRegister').style.display = 'none';
-            document.getElementById('stepLogin').style.display = 'none';
-            document.getElementById('stepVerify').style.display = 'none';
-            document.getElementById('stepChoice').style.display = 'flex';
-        }
-
-        function toggleRefInput(show) {
-            document.getElementById('refPhoneContainer').style.display = show ? 'block' : 'none';
-        }
-
-        function toggleInfoModal(show) {
-            document.getElementById('infoModal').style.display = show ? 'flex' : 'none';
-        }
-
-        function initRecaptcha() {
-            if (!window.recaptchaVerifier) {
-                window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-                    'size': 'invisible',
-                    'callback': (response) => {}
-                });
-            }
-        }
-
-        function startRegistrationSMS() {
-            const names = document.getElementById('regNames').value.trim();
-            const phoneInput = document.getElementById('regPhone').value.trim();
-            const address = document.getElementById('regAddress').value.trim();
-
-            if (!names || !phoneInput || !address) {
-                alert('Por favor, completa al menos tu nombre, teléfono y dirección.');
-                return;
-            }
-
-            const fullPhone = phoneInput.startsWith('+') ? phoneInput : '+34' + phoneInput;
-
-            pendingUserData = { names, phone: fullPhone, address, isNew: true };
-            sendSMS(fullPhone);
-        }
-
-        function startLoginSMS() {
-            const phoneInput = document.getElementById('loginPhone').value.trim();
-            if (!phoneInput) {
-                alert('Por favor, introduce tu número de teléfono.');
-                return;
-            }
-
-            const fullPhone = phoneInput.startsWith('+') ? phoneInput : '+34' + phoneInput;
-
-            pendingUserData = { phone: fullPhone, isNew: false };
-            sendSMS(fullPhone);
-        }
-
-        function sendSMS(phoneNumber) {
-            initRecaptcha();
-            const appVerifier = window.recaptchaVerifier;
-
-            firebase.auth().signInWithPhoneNumber(phoneNumber, appVerifier)
-                .then((confirmationResult) => {
-                    confirmationResultGlobal = confirmationResult;
-                    document.getElementById('stepRegister').style.display = 'none';
-                    document.getElementById('stepLogin').style.display = 'none';
-                    document.getElementById('stepVerify').style.display = 'flex';
-                    alert('¡Código SMS enviado con éxito a tu móvil!');
-                }).catch((error) => {
-                    console.error("Error al enviar el SMS:", error);
-                    alert('Error al enviar el SMS: ' + error.message);
-                    if (window.recaptchaVerifier) {
-                        window.recaptchaVerifier.render().then(widgetId => grecaptcha.reset(widgetId));
-                    }
-                });
-        }
-
-        function verifySMSCode() {
-            const code = document.getElementById('smsCode').value.trim();
-            if (!code || code.length !== 6) {
-                alert('Por favor, introduce un código de verificación válido de 6 dígitos.');
-                return;
-            }
-
-            confirmationResultGlobal.confirm(code).then((result) => {
-                const userDataToSave = {
-                    name: pendingUserData.isNew ? pendingUserData.names : 'Cliente',
-                    phone: pendingUserData.phone,
-                    napas: pendingUserData.isNew ? 0 : 2
-                };
-                localStorage.setItem('pachoncito_user', JSON.stringify(userDataToSave));
-
-                alert('¡Autenticación completada con éxito! Redirigiendo a la tienda...');
-                window.location.href = 'index.html';
-            }).catch((error) => {
-                console.error("Código incorrecto:", error);
-                alert('El código introducido es incorrecto o ha caducado.');
-            });
-        }
-    </script>
+    <script type="module" src="acceso.js"></script>
 </body>
 </html>

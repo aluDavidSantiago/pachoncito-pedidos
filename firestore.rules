@@ -1,0 +1,144 @@
+rules_version = '2';
+
+// Reglas de seguridad de Pachoncito Pedidos.
+// Despliegue: firebase deploy --only firestore:rules
+//
+// Colecciones:
+//   admins/{uid}            Alta manual desde la consola de Firebase. Marca qué cuentas son del obrador.
+//   orders/{id}             Cualquiera puede CREAR un pedido válido; solo el obrador lo lee y modifica.
+//   customers/{telefono}    Privado. Lo mantiene el panel al marcar pedidos como entregados.
+//   reviews/{uid_producto}  Público y anónimo. Solo clientes verificados por SMS con compra previa.
+//   reviewAuthors/{id}      Privado. Vincula cada reseña con su teléfono (solo lo ve el obrador).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Utilidades ----------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isPhone(value) {
+      return value is string && value.matches('^[+][0-9]{8,15}$');
+    }
+
+    function isQty(value) {
+      return value is int && value >= 0 && value <= 200;
+    }
+
+    function isStars(value) {
+      return value is int && value >= 1 && value <= 5;
+    }
+
+    function verifiedPhone() {
+      return request.auth.token.phone_number;
+    }
+
+    // ---------- Pedidos ----------
+
+    // Precios en céntimos: deben coincidir con shared.js (clásico 150, bocadillo 170, envío 100).
+    function validNewOrder(d) {
+      return d.keys().hasAll(['customerName', 'phone', 'items', 'subtotalCents', 'deliveryCents',
+                              'totalCents', 'napaCount', 'deliveryMethod', 'address', 'deliverySlot',
+                              'status', 'createdAt'])
+        && d.keys().hasOnly(['customerName', 'phone', 'items', 'subtotalCents', 'deliveryCents',
+                             'totalCents', 'napaCount', 'deliveryMethod', 'address', 'deliverySlot',
+                             'status', 'createdAt', 'referralCode'])
+        && d.customerName is string
+        && d.customerName.size() >= 2 && d.customerName.size() <= 80
+        && isPhone(d.phone)
+        && d.items is map
+        && d.items.keys().hasAll(['clasico', 'bocadillo'])
+        && d.items.keys().hasOnly(['clasico', 'bocadillo'])
+        && isQty(d.items.clasico)
+        && isQty(d.items.bocadillo)
+        && d.items.clasico + d.items.bocadillo > 0
+        && d.deliveryMethod in ['recogida', 'domicilio']
+        && d.deliveryCents == (d.deliveryMethod == 'domicilio' ? 100 : 0)
+        && d.subtotalCents == d.items.clasico * 150 + d.items.bocadillo * 170
+        && d.totalCents == d.subtotalCents + d.deliveryCents
+        && d.napaCount == math.floor(d.totalCents / 1000)
+        && d.address is string
+        && (d.deliveryMethod == 'domicilio'
+              ? (d.address.size() >= 5 && d.address.size() <= 200)
+              : d.address == 'Recogida en local')
+        && d.deliverySlot is string
+        && d.deliverySlot.matches('^(0[6-9]|1[0-7]):(00|30)$')
+        && (!('referralCode' in d) || (isPhone(d.referralCode) && d.referralCode != d.phone))
+        && d.status == 'pending'
+        && d.createdAt == request.time;
+    }
+
+    match /admins/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list, write: if false;
+    }
+
+    match /orders/{orderId} {
+      allow create: if validNewOrder(request.resource.data);
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ---------- Clientes ----------
+
+    // Las ñapas por referidos o reseñas (napaCredits) solo las puede escribir el obrador.
+    match /customers/{phone} {
+      allow read, write: if isAdmin();
+    }
+
+    // ---------- Reseñas ----------
+
+    function hasPurchased(phone, product) {
+      let path = /databases/$(database)/documents/customers/$(phone);
+      return exists(path) && get(path).data.get('purchased', {}).get(product, 0) > 0;
+    }
+
+    function validReview(d) {
+      return d.keys().hasAll(['product', 'ratings', 'comment', 'rewarded', 'createdAt'])
+        && d.keys().hasOnly(['product', 'ratings', 'comment', 'rewarded', 'createdAt'])
+        && d.product in ['clasico', 'bocadillo']
+        && d.ratings is map
+        && d.ratings.keys().hasAll(['producto', 'entrega', 'atencion'])
+        && d.ratings.keys().hasOnly(['producto', 'entrega', 'atencion'])
+        && isStars(d.ratings.producto)
+        && isStars(d.ratings.entrega)
+        && isStars(d.ratings.atencion)
+        && d.comment is string
+        && d.comment.size() <= 500
+        && d.rewarded == false
+        && d.createdAt == request.time;
+    }
+
+    // Una reseña por cliente y producto: el id es "<uid>_<producto>" y solo se permite crearla, nunca sobrescribirla.
+    // El documento público no guarda nombre ni teléfono.
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if signedIn()
+        && isPhone(verifiedPhone())
+        && reviewId == request.auth.uid + '_' + request.resource.data.product
+        && validReview(request.resource.data)
+        && hasPurchased(verifiedPhone(), request.resource.data.product)
+        && existsAfter(/databases/$(database)/documents/reviewAuthors/$(reviewId));
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rewarded']);
+      allow delete: if isAdmin();
+    }
+
+    match /reviewAuthors/{reviewId} {
+      allow create: if signedIn()
+        && isPhone(verifiedPhone())
+        && request.resource.data.keys().hasAll(['uid', 'phone', 'product'])
+        && request.resource.data.keys().hasOnly(['uid', 'phone', 'product'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.phone == verifiedPhone()
+        && reviewId == request.auth.uid + '_' + request.resource.data.product
+        && existsAfter(/databases/$(database)/documents/reviews/$(reviewId));
+      allow read, delete: if isAdmin();
+    }
+  }
+}

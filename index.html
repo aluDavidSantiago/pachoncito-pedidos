@@ -2,119 +2,106 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <!-- Favicon para modo oscuro (se muestra si el navegador está en dark mode) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#151210">
+    <meta name="description" content="Reserva tus pandebonos artesanales Pachoncito en Premià de Mar. Recogida en obrador o envío a domicilio los domingos.">
     <link rel="icon" href="faviconB.png" media="(prefers-color-scheme: dark)">
-    <!-- Favicon para modo claro (se muestra si el navegador está en light mode) -->
     <link rel="icon" href="faviconW.png" media="(prefers-color-scheme: light)">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pachoncito | Pedidos</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <header>
+        <header class="site-header">
             <div class="logo-container">
-                <img src="1.png" alt="Pachoncito" class="brand-logo">
+                <img src="1.png" alt="Pachoncito" class="brand-logo" width="300" height="73">
             </div>
             <div class="badge">Reservas de Lunes a Viernes | Entregas los domingos</div>
         </header>
 
-        <form id="orderForm">
-            <div class="section-delivery">
+        <form id="orderForm" novalidate>
+            <div class="field">
                 <label for="nombre">Nombre y Apellidos</label>
-                <input type="text" id="nombre" required placeholder="Tu nombre completo">
+                <input type="text" id="nombre" required maxlength="80" autocomplete="name" placeholder="Tu nombre completo">
             </div>
 
-            <div class="section-delivery">
+            <div class="field">
                 <label for="telefono">Teléfono de Contacto</label>
-                <input type="tel" id="telefono" required placeholder="+34 600 000 000">
+                <input type="tel" id="telefono" required inputmode="tel" autocomplete="tel" placeholder="600 000 000">
             </div>
 
             <div class="products-section">
                 <div class="product-card">
                     <div class="product-info">
                         <h3>Clásico</h3>
-                        <span class="price">1.50 €</span>
+                        <span class="price" data-price="clasico"></span>
                     </div>
                     <div class="counter">
-                        <button type="button" onclick="changeQty('clasico', -1)">-</button>
-                        <input type="number" id="clasico" value="0" min="0" readonly>
-                        <button type="button" onclick="changeQty('clasico', 1)">+</button>
+                        <button type="button" data-product="clasico" data-delta="-1" aria-label="Quitar un clásico">−</button>
+                        <output id="clasico" aria-live="polite">0</output>
+                        <button type="button" data-product="clasico" data-delta="1" aria-label="Añadir un clásico">+</button>
                     </div>
                 </div>
 
                 <div class="product-card">
                     <div class="product-info">
                         <h3>Con Bocadillo (Guayaba)</h3>
-                        <span class="price">1.70 €</span>
+                        <span class="price" data-price="bocadillo"></span>
                     </div>
                     <div class="counter">
-                        <button type="button" onclick="changeQty('bocadillo', -1)">-</button>
-                        <input type="number" id="bocadillo" value="0" min="0" readonly>
-                        <button type="button" onclick="changeQty('bocadillo', 1)">+</button>
+                        <button type="button" data-product="bocadillo" data-delta="-1" aria-label="Quitar uno con bocadillo">−</button>
+                        <output id="bocadillo" aria-live="polite">0</output>
+                        <button type="button" data-product="bocadillo" data-delta="1" aria-label="Añadir uno con bocadillo">+</button>
                     </div>
                 </div>
             </div>
 
-            <div id="napaAlert" class="alert-box">
+            <div id="napaAlert" class="alert-box" aria-live="polite">
                 Añade más productos para activar la bonificación.
             </div>
 
-            <div class="section-delivery">
+            <div class="field">
                 <label for="tipoEntrega">Método de Entrega</label>
-                <select id="tipoEntrega" onchange="toggleDireccion()">
+                <select id="tipoEntrega">
                     <option value="recogida">Recogida en Obrador (Premià de Mar)</option>
-                    <option value="domicilio">Envío a Domicilio (+1.00 EUR)</option>
+                    <option value="domicilio">Envío a Domicilio (+1,00 €)</option>
                 </select>
             </div>
 
-            <div class="section-delivery" id="direccionBox" style="display: none;">
+            <div class="field field-reveal" id="direccionBox" hidden>
                 <label for="direccion">Dirección de Entrega</label>
-                <input type="text" id="direccion" placeholder="Calle, número, piso...">
+                <input type="text" id="direccion" maxlength="200" autocomplete="street-address" placeholder="Calle, número, piso...">
             </div>
 
-            <div class="section-delivery">
+            <div class="field">
                 <label for="hora">Hora de Entrega</label>
-                <!-- MODIFICACIÓN: Horas individuales de 30 en 30 minutos integradas tal como pediste -->
-                <select id="hora" required class="placeholder-select">
+                <!-- Las franjas de 30 minutos (06:00–17:30) se generan en script.js -->
+                <select id="hora" required>
                     <option value="" disabled selected>Selecciona una franja horaria</option>
-                    <option value="06:00">06:00</option>
-                    <option value="06:30">06:30</option>
-                    <option value="07:00">07:00</option>
-                    <option value="07:30">07:30</option>
-                    <option value="08:00">08:00</option>
-                    <option value="08:30">08:30</option>
-                    <option value="09:00">09:00</option>
-                    <option value="09:30">09:30</option>
-                    <option value="10:00">10:00</option>
-                    <option value="10:30">10:30</option>
-                    <option value="11:00">11:00</option>
-                    <option value="11:30">11:30</option>
-                    <option value="12:00">12:00</option>
-                    <option value="12:30">12:30</option>
-                    <option value="13:00">13:00</option>
-                    <option value="13:30">13:30</option>
-                    <option value="14:00">14:00</option>
-                    <option value="14:30">14:30</option>
-                    <option value="15:00">15:00</option>
-                    <option value="15:30">15:30</option>
-                    <option value="16:00">16:00</option>
-                    <option value="16:30">16:30</option>
-                    <option value="17:00">17:00</option>
-                    <option value="17:30">17:30</option>
                 </select>
             </div>
+
+            <div class="field">
+                <label for="referido">Código de referido <span class="optional">(opcional)</span></label>
+                <input type="tel" id="referido" inputmode="tel" autocomplete="off" placeholder="Teléfono de quien te recomendó">
+                <p class="hint">¿Es tu primer pedido y alguien te recomendó? Escribe su teléfono: cuando recibas tu pedido, esa persona gana una ñapa gratis en su próximo pedido.</p>
+            </div>
+
+            <p id="formMessage" class="form-message" role="status" aria-live="polite" hidden></p>
 
             <div class="summary">
-                <h3>Total a Pagar: <span id="totalPrice">0.00</span> EUR</h3>
-                <button type="submit" class="btn-primary">Reservar Pedido</button>
+                <p class="summary-total">Total a pagar <strong id="totalPrice">0,00 €</strong></p>
+                <button type="submit" class="btn btn-primary" id="submitBtn">Reservar pedido 🥖</button>
             </div>
         </form>
 
-        <!-- Footer / Redes Sociales -->
         <footer class="site-footer">
+            <nav class="footer-links" aria-label="Más opciones">
+                <a href="resenas.html" class="btn btn-secondary">⭐ Reseñas</a>
+                <a href="acceso.html" class="btn btn-secondary">👤 Mi cuenta</a>
+            </nav>
             <a href="https://www.instagram.com/pachoncito_oficial" target="_blank" rel="noopener noreferrer" class="instagram-link">
-                <svg class="instagram-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg class="instagram-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
                     <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
                     <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
