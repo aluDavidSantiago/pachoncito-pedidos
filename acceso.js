@@ -1,10 +1,9 @@
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { app } from "./firebase.js";
+import { auth } from "./auth.js";
+import { mountEnvBanner } from "./env.js";
 import { createPhoneLogin, phoneAuthErrorMessage } from "./phone-auth.js";
 import { normalizePhone, showMessage, storage, withBusy } from "./shared.js";
 
-const auth = getAuth(app);
-auth.languageCode = 'es';
+mountEnvBanner();
 const phoneLogin = createPhoneLogin(auth, 'recaptcha-container');
 
 const $ = id => document.getElementById(id);
@@ -33,10 +32,13 @@ $('closeInfoBtn').addEventListener('click', () => $('infoModal').close());
 
 async function sendCode(phone, button) {
     try {
-        await withBusy(button, 'Enviando SMS…', () => phoneLogin.send(phone));
+        const { suggestedCode } = await withBusy(button, 'Enviando SMS…', () => phoneLogin.send(phone));
         showStep('stepVerify');
-        showMessage(message, '¡Código SMS enviado a tu móvil!', 'success');
-        $('smsCode').focus();
+        $('smsCode').value = suggestedCode || '';
+        showMessage(message, suggestedCode
+            ? '🧪 Número de prueba: no se envía SMS y el código ya está rellenado.'
+            : '¡Código SMS enviado a tu móvil!', 'success');
+        $(suggestedCode ? 'verifyBtn' : 'smsCode').focus();
     } catch (error) {
         console.error('Error al enviar el SMS:', error);
         showMessage(message, phoneAuthErrorMessage(error), 'error');

@@ -1,6 +1,7 @@
 // Inicialización única de Firebase para todas las páginas
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { connectFirestoreEmulator, getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { EMULATORS, USE_EMULATORS } from "./env.js";
 
 export const firebaseConfig = {
     apiKey: "AIzaSyCd0fYKBpOj5tVzE3S3yN71IbTvyPXsFZw",
@@ -14,3 +15,5 @@ export const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+
+if (USE_EMULATORS) connectFirestoreEmulator(db, EMULATORS.firestoreHost, EMULATORS.firestorePort);

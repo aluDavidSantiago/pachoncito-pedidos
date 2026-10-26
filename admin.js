@@ -2,11 +2,15 @@ import {
     collection, deleteDoc, doc, getDoc, limit, onSnapshot, orderBy, query,
     runTransaction, serverTimestamp, updateDoc, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { app, db } from "./firebase.js";
-import { el, formatDate, formatEUR, normalizePhone, PRODUCT_NAMES, RATING_ASPECTS, showMessage, starsText, withBusy } from "./shared.js";
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { auth } from "./auth.js";
+import { isTestPhone, mountEnvBanner, TEST_CUSTOMERS, TEST_OTP, USE_EMULATORS } from "./env.js";
+import { db } from "./firebase.js";
+import { completeOrder, normalizeOrder } from "./orders.js";
+import { clearTestData, seedTestData } from "./seeder.js";
+import { el, formatDate, formatEUR, PRODUCT_NAMES, RATING_ASPECTS, showMessage, starsText, withBusy } from "./shared.js";
 
-const auth = getAuth(app);
+mountEnvBanner();
 const $ = id => document.getElementById(id);
 const adminMessage = $('adminMessage');
 
@@ -89,18 +93,6 @@ onAuthStateChanged(auth, async user => {
 });
 
 // ---------- Datos en tiempo real ----------
-
-function normalizeOrder(snap) {
-    const data = snap.data();
-    return {
-        ...data,
-        id: snap.id,
-        // Compatibilidad con pedidos antiguos guardados en euros
-        totalCents: Number.isInteger(data.totalCents) ? data.totalCents : Math.round((data.total || 0) * 100),
-        napaCount: data.napaCount ?? (data.hasNapa ? 1 : 0),
-        phoneKey: normalizePhone(data.phone)
-    };
-}
 
 function startListeners() {
     const onError = error => {
@@ -267,7 +259,8 @@ function orderCard(order) {
 
     return el('article', { className: 'order-card' },
         el('div', { className: 'order-info' },
-            el('h3', {}, order.customerName || 'Sin nombre', phoneNode),
+            el('h3', {}, order.customerName || 'Sin nombre', phoneNode,
+                isTestPhone(order.phoneKey) ? el('span', { className: 'test-tag', text: '🧪 Prueba' }) : null),
             meta,
             actions
         ),
@@ -288,7 +281,7 @@ async function changeStatus(order, newStatus, button) {
     try {
         if (newStatus === 'completed') {
             if (!confirm('¿Marcar como entregado? Se registrará la compra del cliente, se canjearán sus ñapas acumuladas y, si vino recomendado, su recomendador ganará una ñapa. No se puede deshacer.')) return;
-            const result = await withBusy(button, '…', () => completeOrder(order.id));
+            const result = await withBusy(button, '…', () => completeOrder(db, order.id));
             if (result) {
                 const notes = ['Pedido entregado y registrado.'];
                 if (result.creditsRedeemed) notes.push(`Ñapas acumuladas canjeadas: ${result.creditsRedeemed}.`);
@@ -303,70 +296,6 @@ async function changeStatus(order, newStatus, button) {
         console.error('Error al actualizar estado:', error);
         showMessage(adminMessage, 'No se pudo actualizar el pedido.', 'error');
     }
-}
-
-// Al entregar un pedido: se registra al cliente, se canjean sus ñapas acumuladas
-// y, si es su primera compra y trae código de referido válido, el recomendador gana 1 ñapa.
-function completeOrder(orderId) {
-    return runTransaction(db, async tx => {
-        const orderRef = doc(db, 'orders', orderId);
-        const orderSnap = await tx.get(orderRef);
-        if (!orderSnap.exists()) throw new Error('El pedido ya no existe.');
-        const order = normalizeOrder(orderSnap);
-        if (order.status === 'completed') return null;
-
-        const orderUpdate = { status: 'completed', completedAt: serverTimestamp() };
-        if (!order.phoneKey) {
-            tx.update(orderRef, orderUpdate);
-            return { warning: 'El teléfono no es válido: no se pudo registrar al cliente.' };
-        }
-
-        const customerRef = doc(db, 'customers', order.phoneKey);
-        const customerSnap = await tx.get(customerRef);
-        const customer = customerSnap.exists() ? customerSnap.data() : null;
-        const isFirstPurchase = !customer?.completedOrders;
-
-        let referrerRef = null;
-        let referrer = null;
-        const referrerPhone = normalizePhone(order.referralCode);
-        if (isFirstPurchase && referrerPhone && referrerPhone !== order.phoneKey && !order.referralRewarded) {
-            referrerRef = doc(db, 'customers', referrerPhone);
-            const referrerSnap = await tx.get(referrerRef);
-            // Solo cuenta si el recomendador ya es cliente con alguna compra entregada
-            if (referrerSnap.exists() && referrerSnap.data().completedOrders > 0) referrer = referrerSnap.data();
-        }
-
-        const purchased = customer?.purchased || {};
-        const creditsRedeemed = customer?.napaCredits || 0;
-        const customerData = {
-            name: order.customerName || customer?.name || '',
-            phone: order.phoneKey,
-            completedOrders: (customer?.completedOrders || 0) + 1,
-            totalSpentCents: (customer?.totalSpentCents || 0) + order.totalCents,
-            purchased: {
-                clasico: (purchased.clasico || 0) + (order.items?.clasico || 0),
-                bocadillo: (purchased.bocadillo || 0) + (order.items?.bocadillo || 0)
-            },
-            napaCredits: 0,
-            updatedAt: serverTimestamp()
-        };
-        if (!customer) customerData.createdAt = serverTimestamp();
-        if (referrer) customerData.referredBy = referrerPhone;
-        tx.set(customerRef, customerData, { merge: true });
-
-        if (referrer) {
-            tx.update(referrerRef, {
-                napaCredits: (referrer.napaCredits || 0) + 1,
-                referralsCount: (referrer.referralsCount || 0) + 1,
-                updatedAt: serverTimestamp()
-            });
-            orderUpdate.referralRewarded = true;
-        }
-
-        orderUpdate.creditsRedeemed = creditsRedeemed;
-        tx.update(orderRef, orderUpdate);
-        return { creditsRedeemed, referrerRewarded: Boolean(referrer) };
-    });
 }
 
 async function deleteOrder(orderId) {
@@ -388,7 +317,8 @@ function reviewCard(review) {
 
     return el('article', { className: 'order-card' },
         el('div', { className: 'order-info' },
-            el('h3', { text: PRODUCT_NAMES[review.product] || review.product }),
+            el('h3', {}, PRODUCT_NAMES[review.product] || review.product,
+                review.test ? el('span', { className: 'test-tag', text: '🧪 Prueba' }) : null),
             el('p', { className: 'order-meta stars-static', text: scores }),
             review.comment ? el('p', { className: 'review-comment', text: review.comment }) : null,
             el('p', { className: 'order-meta', text: formatDate(review.createdAt) }),
@@ -468,3 +398,46 @@ async function deleteReview(reviewId) {
         showMessage(adminMessage, 'No se pudo eliminar la reseña.', 'error');
     }
 }
+
+// ---------- Datos de prueba ----------
+
+const seedMessage = $('seedMessage');
+
+$('testAccounts').replaceChildren(...TEST_CUSTOMERS.map(customer =>
+    el('li', {}, el('strong', { text: customer.name }), ` · ${customer.phone}`)
+));
+$('testOtp').textContent = TEST_OTP;
+$('testTarget').textContent = USE_EMULATORS ? 'los emuladores locales' : 'la base de datos REAL (producción)';
+
+function confirmTarget(action) {
+    return USE_EMULATORS || confirm(`Vas a ${action} en la base de datos REAL de producción. Solo afecta a los teléfonos de prueba (+34 600 000 000–006). ¿Continuar?`);
+}
+
+function seedErrorMessage(error) {
+    return error?.code === 'permission-denied'
+        ? 'Firestore rechazó la operación. ¿Has desplegado la última versión de firestore.rules?'
+        : 'No se pudo completar la operación con los datos de prueba.';
+}
+
+$('seedBtn').addEventListener('click', async event => {
+    if (!confirmTarget('generar datos de prueba')) return;
+    try {
+        const result = await withBusy(event.currentTarget, 'Generando…',
+            () => seedTestData(db, step => showMessage(seedMessage, `🧪 ${step}…`)));
+        showMessage(seedMessage, `🧪 Datos de prueba listos: ${result.orders} pedidos y ${result.reviews} reseñas.`, 'success');
+    } catch (error) {
+        console.error('Error generando datos de prueba:', error);
+        showMessage(seedMessage, seedErrorMessage(error), 'error');
+    }
+});
+
+$('clearSeedBtn').addEventListener('click', async event => {
+    if (!confirmTarget('borrar los datos de prueba')) return;
+    try {
+        const result = await withBusy(event.currentTarget, 'Borrando…', () => clearTestData(db));
+        showMessage(seedMessage, `🧹 Borrados ${result.orders} pedidos y ${result.reviews} reseñas de prueba, y sus clientes.`, 'success');
+    } catch (error) {
+        console.error('Error borrando datos de prueba:', error);
+        showMessage(seedMessage, seedErrorMessage(error), 'error');
+    }
+});

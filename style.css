@@ -1050,6 +1050,64 @@ main > .form-message {
     .actions-bar .btn-small { flex: 1 1 calc(50% - 4px); }
 }
 
+/* ---------- Modo pruebas ---------- */
+
+.env-banner {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 50;
+    padding: calc(8px + env(safe-area-inset-top)) 16px 8px;
+    background: #2a1f3d;
+    color: var(--violet);
+    border-bottom: 1px solid rgba(168, 85, 247, 0.4);
+    font-size: 13px;
+    text-align: center;
+}
+
+body.has-env-banner {
+    padding-top: calc(64px + env(safe-area-inset-top));
+}
+
+.test-tag {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: var(--violet-soft);
+    color: var(--violet);
+    font-size: 12px;
+    font-weight: 600;
+    vertical-align: middle;
+}
+
+.test-tools {
+    margin-top: 28px;
+    border-color: rgba(168, 85, 247, 0.35);
+}
+
+.test-tools summary {
+    min-height: var(--tap);
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--violet);
+}
+
+.test-tools[open] summary {
+    margin-bottom: 12px;
+}
+
+.test-accounts {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 6px 16px;
+    font-size: 14px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
 /* ---------- Efectos solo con ratón (en táctil se quedan "pegados") ---------- */
 
 @media (hover: hover) {

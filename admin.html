@@ -96,6 +96,28 @@
             <div id="reviewsContainer" class="orders-list">
                 <p class="loading-state">Cargando reseñas…</p>
             </div>
+
+            <details class="panel-box test-tools">
+                <summary>🧪 Datos de prueba</summary>
+                <div class="form-section">
+                    <p class="section-desc">
+                        Genera un escenario completo en <strong id="testTarget"></strong>: pedidos en todos los estados,
+                        clientes con compras, un referido ya premiado (Bruno → Ana), otro pendiente (Carla → Bruno),
+                        uno inválido (Elena → Fran) y reseñas de prueba. Regenerar borra antes los datos de prueba anteriores.
+                        Solo afecta a los teléfonos de prueba; los pedidos reales no se tocan.
+                    </p>
+                    <ul id="testAccounts" class="test-accounts"></ul>
+                    <p class="hint">
+                        Para entrar como estos clientes en «Mi cuenta» o «Reseñas» usa el código <strong id="testOtp"></strong>.
+                        +34 600 000 000 queda libre para probar como cliente nuevo.
+                    </p>
+                    <div class="actions-bar">
+                        <button type="button" id="seedBtn" class="btn btn-small">🧪 Generar / regenerar datos de prueba</button>
+                        <button type="button" id="clearSeedBtn" class="btn btn-small btn-danger">🧹 Borrar datos de prueba</button>
+                    </div>
+                    <p id="seedMessage" class="form-message" role="status" aria-live="polite" hidden></p>
+                </div>
+            </details>
         </main>
     </div>
 

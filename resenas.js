@@ -1,13 +1,14 @@
 import {
     collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { app, db } from "./firebase.js";
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { auth } from "./auth.js";
+import { isTestPhone, mountEnvBanner, TEST_MODE } from "./env.js";
+import { db } from "./firebase.js";
 import { createPhoneLogin, phoneAuthErrorMessage } from "./phone-auth.js";
 import { el, formatDate, normalizePhone, PRODUCT_NAMES, RATING_ASPECTS, showMessage, starsText, storage, withBusy } from "./shared.js";
 
-const auth = getAuth(app);
-auth.languageCode = 'es';
+mountEnvBanner();
 const phoneLogin = createPhoneLogin(auth, 'recaptcha-container');
 
 const $ = id => document.getElementById(id);
@@ -51,7 +52,11 @@ function renderList(reviews) {
     }
     list.replaceChildren(...reviews.map(review => el('article', { className: 'review-card' },
         el('div', { className: 'review-meta' },
-            el('span', {}, el('span', { className: 'verified', text: '✔ Cliente verificado' }), ` · ${PRODUCT_NAMES[review.product] || ''}`),
+            el('span', {},
+                review.test
+                    ? el('span', { className: 'test-tag', text: '🧪 Reseña de prueba' })
+                    : el('span', { className: 'verified', text: '✔ Cliente verificado' }),
+                ` · ${PRODUCT_NAMES[review.product] || ''}`),
             el('span', { text: formatDate(review.createdAt) })
         ),
         el('div', { className: 'review-scores' },
@@ -64,7 +69,8 @@ function renderList(reviews) {
 async function loadReviews() {
     try {
         const snap = await getDocs(query(collection(db, 'reviews'), orderBy('createdAt', 'desc'), limit(50)));
-        const reviews = snap.docs.map(d => d.data());
+        // Las reseñas de cuentas de prueba solo se ven en modo pruebas y nunca cuentan para el público
+        const reviews = snap.docs.map(d => d.data()).filter(review => TEST_MODE || !review.test);
         renderSummary(reviews);
         renderList(reviews);
     } catch (error) {
@@ -125,10 +131,13 @@ $('sendCodeBtn').addEventListener('click', async event => {
         return;
     }
     try {
-        await withBusy(event.currentTarget, 'Enviando SMS…', () => phoneLogin.send(phone));
+        const { suggestedCode } = await withBusy(event.currentTarget, 'Enviando SMS…', () => phoneLogin.send(phone));
         showStep('code');
-        showMessage(message, 'Te hemos enviado un SMS con el código.', 'success');
-        $('reviewCode').focus();
+        $('reviewCode').value = suggestedCode || '';
+        showMessage(message, suggestedCode
+            ? '🧪 Número de prueba: no se envía SMS y el código ya está rellenado.'
+            : 'Te hemos enviado un SMS con el código.', 'success');
+        $(suggestedCode ? 'verifyCodeBtn' : 'reviewCode').focus();
     } catch (error) {
         console.error('Error al enviar el SMS:', error);
         showMessage(message, phoneAuthErrorMessage(error), 'error');
@@ -185,7 +194,12 @@ form.addEventListener('submit', async event => {
     // La reseña pública no lleva datos personales; el vínculo con el teléfono va aparte y es privado
     const reviewId = `${currentUser.uid}_${product}`;
     const batch = writeBatch(db);
-    batch.set(doc(db, 'reviews', reviewId), { product, ratings, comment, rewarded: false, createdAt: serverTimestamp() });
+    batch.set(doc(db, 'reviews', reviewId), {
+        product, ratings, comment,
+        test: isTestPhone(currentUser.phoneNumber), // las reglas comprueban que coincide con el teléfono verificado
+        rewarded: false,
+        createdAt: serverTimestamp()
+    });
     batch.set(doc(db, 'reviewAuthors', reviewId), { uid: currentUser.uid, phone: currentUser.phoneNumber, product });
 
     try {

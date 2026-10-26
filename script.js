@@ -1,6 +1,10 @@
-import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { mountEnvBanner } from "./env.js";
 import { db } from "./firebase.js";
-import { DELIVERY_CENTS, el, formatEUR, MAX_QTY, NAPA_EVERY_CENTS, normalizePhone, PRICES_CENTS, showMessage, storage } from "./shared.js";
+import { buildOrder, priceOrder } from "./orders.js";
+import { el, formatEUR, MAX_QTY, NAPA_EVERY_CENTS, normalizePhone, PRICES_CENTS, showMessage, storage } from "./shared.js";
+
+mountEnvBanner();
 
 const $ = id => document.getElementById(id);
 const form = $('orderForm');
@@ -22,11 +26,7 @@ for (let minutes = 6 * 60; minutes <= 17 * 60 + 30; minutes += 30) {
 
 function computeOrder() {
     const deliveryMethod = $('tipoEntrega').value;
-    const subtotalCents = quantities.clasico * PRICES_CENTS.clasico + quantities.bocadillo * PRICES_CENTS.bocadillo;
-    const deliveryCents = deliveryMethod === 'domicilio' ? DELIVERY_CENTS : 0;
-    const totalCents = subtotalCents + deliveryCents;
-    // Las ñapas se calculan cada 10 € del total (incluyendo el envío)
-    return { deliveryMethod, subtotalCents, deliveryCents, totalCents, napaCount: Math.floor(totalCents / NAPA_EVERY_CENTS) };
+    return { deliveryMethod, ...priceOrder(quantities, deliveryMethod) };
 }
 
 function updateSummary() {
@@ -111,23 +111,15 @@ form.addEventListener('submit', async event => {
     submitBtn.textContent = 'Guardando pedido… ⏳';
 
     try {
-        const orderData = {
-            customerName: nombre,
+        await addDoc(collection(db, 'orders'), buildOrder({
+            name: nombre,
             phone,
-            items: { clasico: quantities.clasico, bocadillo: quantities.bocadillo },
-            subtotalCents: order.subtotalCents,
-            deliveryCents: order.deliveryCents,
-            totalCents: order.totalCents,
-            napaCount: order.napaCount,
+            items: quantities,
             deliveryMethod: order.deliveryMethod,
-            address: order.deliveryMethod === 'domicilio' ? direccion : 'Recogida en local',
-            deliverySlot: hora,
-            status: 'pending',
-            createdAt: serverTimestamp()
-        };
-        if (referralCode) orderData.referralCode = referralCode;
-
-        await addDoc(collection(db, 'orders'), orderData);
+            address: direccion,
+            slot: hora,
+            referralCode
+        }));
 
         const savedUser = storage.get('pachoncito_user') || {};
         storage.set('pachoncito_user', { ...savedUser, name: nombre, phone, address: direccion || savedUser.address || '' });
