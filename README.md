@@ -19,8 +19,11 @@ Plataforma web desarrollada para la gestión, procesamiento y control de pedidos
 
 | Archivo | Función |
 |---|---|
-| `index.html` + `script.js` | Formulario de pedido (con código de referido opcional) |
-| `acceso.html` + `acceso.js` | Registro / acceso por SMS |
+| `index.html` + `script.js` | Carta y pedido (requiere sesión) |
+| `acceso.html` + `acceso.js` | Auth wall: verificación por SMS, alta del cliente e invitación a instalar |
+| `cuenta.html` + `cuenta.js` | Mi cuenta: ñapas, historial de pedidos y enlace de referido |
+| `session.js` | Guardia de navegación y sesión del cliente (real o de prueba) |
+| `pwa.js` + `sw.js` + `manifest.json` + `icons/` | App instalable (PWA) y funcionamiento básico sin conexión |
 | `resenas.html` + `resenas.js` | Valoraciones anónimas de clientes verificados |
 | `admin.html` + `admin.js` | Panel del obrador (requiere login) |
 | `firebase.js` / `auth.js` | Configuración única de Firebase (Firestore / Auth) y conexión a emuladores |
@@ -34,7 +37,13 @@ Plataforma web desarrollada para la gestión, procesamiento y control de pedidos
 
 > Los precios y la regla de ñapas están en `shared.js` **y** en `firestore.rules`. Si cambian, hay que actualizar ambos.
 
+> Recorridos de cada perfil (cliente nuevo, recurrente y administrador): ver [USER_JOURNEY.md](USER_JOURNEY.md).
+
 ## Puesta en marcha (Firebase)
+
+> ⚠️ Las páginas de cliente exigen verificar el móvil por SMS. **Activa el proveedor «Teléfono» antes de desplegar**
+> (y revisa la cuota de SMS de tu plan): sin él, ningún cliente real puede entrar ni pedir.
+> Las reglas y el código van juntos: despliega `firestore.rules` y publica la web a la vez.
 
 1. **Authentication → Sign-in method:** activa *Correo electrónico/contraseña* (panel) y *Teléfono* (cuenta y reseñas). Añade tu dominio en *Authorized domains*.
 2. **Crear un administrador:** en *Authentication → Users* crea el usuario del obrador y copia su UID. En *Firestore* crea el documento `admins/{UID}` (puede estar vacío). Las reglas impiden crearlo desde la web.

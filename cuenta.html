@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es" class="auth-pending">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#151210">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icons/favicon-dark-48.png" media="(prefers-color-scheme: dark)">
+    <link rel="icon" href="icons/favicon-light-48.png" media="(prefers-color-scheme: light)">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Pachoncito">
+    <title>Pachoncito | Mi cuenta</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="site-header">
+            <div class="logo-container">
+                <a href="index.html"><img src="1.png" alt="Pachoncito — volver a pedidos" class="brand-logo" width="300" height="73"></a>
+            </div>
+            <div class="badge">👤 Mi cuenta</div>
+        </header>
+
+        <main>
+            <section class="page-section" aria-labelledby="helloTitle">
+                <h2 id="helloTitle">Hola 👋</h2>
+                <p class="section-desc" id="accountPhone"></p>
+
+                <div class="stats-grid account-stats">
+                    <div class="stat-card">
+                        <h3>Ñapas acumuladas 🎁</h3>
+                        <div class="number" id="statNapas">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Pedidos entregados</h3>
+                        <div class="number" id="statOrders">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Amigos recomendados</h3>
+                        <div class="number" id="statReferrals">0</div>
+                    </div>
+                </div>
+                <p class="hint">Las ñapas acumuladas (por recomendar o valorar) se entregan gratis con tu próximo pedido.</p>
+            </section>
+
+            <div id="installSlot"></div>
+
+            <section class="page-section form-section" aria-labelledby="shareTitle">
+                <h2 id="shareTitle">Gana ñapas recomendando</h2>
+                <p class="section-desc">Tu código de referido es tu teléfono. Comparte tu enlace: cuando entreguemos el primer pedido de tu amigo, ganas una ñapa.</p>
+                <button type="button" id="shareBtn" class="btn btn-secondary">🔗 Compartir mi enlace</button>
+                <p id="shareMessage" class="form-message" role="status" aria-live="polite" hidden></p>
+            </section>
+
+            <section class="page-section" aria-labelledby="historyTitle">
+                <h2 id="historyTitle">Mis pedidos</h2>
+                <div id="ordersList" class="reviews-list">
+                    <p class="loading-state">Cargando tus pedidos…</p>
+                </div>
+            </section>
+
+            <section class="page-section">
+                <nav class="footer-links" aria-label="Accesos">
+                    <a href="index.html" class="btn btn-primary">🥖 Hacer pedido</a>
+                    <a href="resenas.html" class="btn btn-secondary">⭐ Valorar</a>
+                </nav>
+                <button type="button" id="logoutBtn" class="btn btn-link">Cerrar sesión</button>
+            </section>
+        </main>
+    </div>
+
+    <script type="module" src="cuenta.js"></script>
+</body>
+</html>

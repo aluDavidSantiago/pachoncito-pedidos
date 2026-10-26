@@ -5,8 +5,8 @@ rules_version = '2';
 //
 // Colecciones:
 //   admins/{uid}            Alta manual desde la consola de Firebase. Marca qué cuentas son del obrador.
-//   orders/{id}             Cualquiera puede CREAR un pedido válido; solo el obrador lo lee y modifica.
-//   customers/{telefono}    Privado. Lo mantiene el panel al marcar pedidos como entregados.
+//   orders/{id}             El cliente verificado crea pedidos a su teléfono y lee los suyos; el obrador lo gestiona todo.
+//   customers/{telefono}    Expediente del cliente. Él crea su perfil (alta) y lo lee; ñapas y compras solo las escribe el obrador.
 //   reviews/{uid_producto}  Público y anónimo. Solo clientes verificados por SMS con compra previa.
 //   reviewAuthors/{id}      Privado. Vincula cada reseña con su teléfono (solo lo ve el obrador).
 service cloud.firestore {
@@ -35,13 +35,20 @@ service cloud.firestore {
       return value is int && value >= 1 && value <= 5;
     }
 
+    // Teléfono verificado por SMS de la sesión ('' si no hay sesión o es una cuenta de email, como la del obrador)
     function verifiedPhone() {
-      return request.auth.token.phone_number;
+      return signedIn() ? request.auth.token.get('phone_number', '') : '';
     }
 
     // Teléfonos ficticios de prueba (+34 600 000 000 a 006 y +34 600 023 456). Deben coincidir con TEST_PHONES de env.js.
     function isTestPhone(phone) {
       return isPhone(phone) && (phone.matches('^[+]3460000000[0-6]$') || phone == '+34600023456');
+    }
+
+    // Puede actuar en nombre de un teléfono: su dueño verificado por SMS, o cualquiera si es un teléfono de prueba
+    // (sesiones de prueba sin SMS; sus datos son ficticios y no se muestran al público)
+    function canActAs(phone) {
+      return isPhone(phone) && (verifiedPhone() == phone || isTestPhone(phone));
     }
 
     // ---------- Pedidos ----------
@@ -84,16 +91,39 @@ service cloud.firestore {
       allow list, write: if false;
     }
 
+    // Auth wall en el servidor: solo se pide a nombre del propio teléfono verificado
     match /orders/{orderId} {
-      allow create: if validNewOrder(request.resource.data);
-      allow read, update, delete: if isAdmin();
+      allow create: if validNewOrder(request.resource.data) && canActAs(request.resource.data.phone);
+      allow read: if isAdmin() || canActAs(resource.data.phone);
+      allow update, delete: if isAdmin();
     }
 
     // ---------- Clientes ----------
 
-    // Las ñapas por referidos o reseñas (napaCredits) solo las puede escribir el obrador.
+    // Perfil que crea el propio cliente en el alta (onboarding). El resto de campos
+    // (napaCredits, completedOrders, purchased, referidos…) solo los escribe el obrador al entregar pedidos.
+    function validProfile(d, phone) {
+      return d.keys().hasAll(['name', 'phone', 'address', 'createdAt', 'updatedAt'])
+        && d.keys().hasOnly(['name', 'phone', 'address', 'referralCode', 'createdAt', 'updatedAt'])
+        && d.name is string && d.name.size() >= 2 && d.name.size() <= 80
+        && d.phone == phone
+        && d.address is string && d.address.size() <= 200
+        && (!('referralCode' in d) || (isPhone(d.referralCode) && d.referralCode != phone))
+        && d.createdAt == request.time
+        && d.updatedAt == request.time;
+    }
+
     match /customers/{phone} {
       allow read, write: if isAdmin();
+      allow get: if canActAs(phone);
+      allow create: if canActAs(phone) && validProfile(request.resource.data, phone);
+      // Expediente creado antes por el obrador: el cliente solo completa nombre y dirección
+      allow update: if canActAs(phone)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'address', 'updatedAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 80
+        && request.resource.data.address is string && request.resource.data.address.size() <= 200
+        && request.resource.data.updatedAt == request.time;
     }
 
     // ---------- Reseñas ----------

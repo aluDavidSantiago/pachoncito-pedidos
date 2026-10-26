@@ -2,9 +2,15 @@ import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/fi
 import { mountEnvBanner } from "./env.js";
 import { db } from "./firebase.js";
 import { buildOrder, priceOrder } from "./orders.js";
+import { mountInstallPrompt, registerServiceWorker } from "./pwa.js";
+import { requireCustomer } from "./session.js";
 import { el, formatEUR, MAX_QTY, NAPA_EVERY_CENTS, normalizePhone, PRICES_CENTS, showMessage, storage } from "./shared.js";
 
 mountEnvBanner();
+registerServiceWorker();
+
+// Auth wall: sin sesión o sin alta completa se redirige a acceso.html y se vuelve aquí después
+const { session, profile } = await requireCustomer();
 
 const $ = id => document.getElementById(id);
 const form = $('orderForm');
@@ -12,6 +18,10 @@ const submitBtn = $('submitBtn');
 const message = $('formMessage');
 const SUBMIT_LABEL = submitBtn.textContent;
 const quantities = { clasico: 0, bocadillo: 0 };
+
+$('accountName').textContent = profile.name.split(' ')[0];
+$('napaBalance').textContent = profile.napaCredits || 0;
+mountInstallPrompt($('installSlot'));
 
 // Precios visibles desde la misma fuente que usa el cálculo
 document.querySelectorAll('[data-price]').forEach(node => {
@@ -68,17 +78,19 @@ function toggleDireccion() {
 
 $('tipoEntrega').addEventListener('change', toggleDireccion);
 
-// Datos guardados de pedidos anteriores o de "Mi cuenta"
+// Datos del expediente del cliente; el teléfono es siempre el verificado de la sesión
+const isFirstOrder = !profile.completedOrders;
+
 function prefill() {
-    const savedUser = storage.get('pachoncito_user');
-    if (savedUser) {
-        $('nombre').value = savedUser.name || '';
-        $('telefono').value = savedUser.phone || '';
-        $('direccion').value = savedUser.address || '';
-    }
-    // Enlaces compartidos tipo index.html?ref=600123456
-    const referral = new URLSearchParams(location.search).get('ref') || storage.get('pachoncito_ref');
-    if (referral) $('referido').value = referral;
+    const savedUser = storage.get('pachoncito_user') || {};
+    $('nombre').value = profile.name || savedUser.name || '';
+    $('telefono').value = session.phone;
+    $('direccion').value = savedUser.address || profile.address || '';
+    // El referido solo tiene sentido en el primer pedido (enlace ?ref= o el indicado en el alta)
+    const referral = isFirstOrder
+        ? new URLSearchParams(location.search).get('ref') || profile.referralCode || storage.get('pachoncito_ref')
+        : null;
+    $('referido').value = referral || '';
 }
 
 function fail(text, field) {
@@ -92,7 +104,7 @@ form.addEventListener('submit', async event => {
     showMessage(message, '');
 
     const nombre = $('nombre').value.trim();
-    const phone = normalizePhone($('telefono').value);
+    const phone = session.phone;
     const direccion = $('direccion').value.trim();
     const hora = $('hora').value;
     const referralRaw = $('referido').value.trim();
@@ -100,7 +112,6 @@ form.addEventListener('submit', async event => {
     const order = computeOrder();
 
     if (nombre.length < 2) return fail('Escribe tu nombre y apellidos.', $('nombre'));
-    if (!phone) return fail('Revisa el teléfono: usa 9 cifras o el formato internacional (+34…).', $('telefono'));
     if (quantities.clasico + quantities.bocadillo === 0) return fail('Selecciona al menos un pandebono para tu pedido.');
     if (order.deliveryMethod === 'domicilio' && direccion.length < 5) return fail('Introduce tu dirección exacta en Premià de Mar.', $('direccion'));
     if (!hora) return fail('Selecciona una hora de entrega.', $('hora'));
@@ -132,7 +143,7 @@ form.addEventListener('submit', async event => {
         $('referido').value = '';
         toggleDireccion();
 
-        showMessage(message, `¡Pedido realizado con éxito, ${nombre}! Nos vemos este domingo 🥖🔥`, 'success');
+        showMessage(message, `¡Pedido realizado con éxito, ${nombre}! Nos vemos este domingo 🥖🔥 Puedes seguirlo en «Mi cuenta».`, 'success');
         message.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } catch (error) {
         console.error('Error al guardar el pedido:', error);
