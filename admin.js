@@ -9,9 +9,11 @@ import { adminAuth, adminDb as db } from "./admin-firebase.js";
 import { mountEnvBanner, TEST_CUSTOMERS, TEST_PHONES_LABEL, USE_EMULATORS } from "./env.js";
 import { completeOrder, normalizeOrder } from "./orders.js";
 import { clearTestData, seedTestData } from "./seeder.js";
+import { initUI } from "./ui.js";
 import { el, formatDate, formatEUR, normalizePhone, PRODUCT_NAMES, RATING_ASPECTS, showMessage, starsText, withBusy } from "./shared.js";
 
 mountEnvBanner();
+initUI();
 const $ = id => document.getElementById(id);
 const adminMessage = $('adminMessage');
 

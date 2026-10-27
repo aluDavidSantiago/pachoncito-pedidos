@@ -6,12 +6,14 @@ import { hydrateIcons } from "./icons.js";
 import { buildOrder, priceOrder } from "./orders.js";
 import { mountInstallPrompt, registerServiceWorker } from "./pwa.js";
 import { requireCustomer } from "./session.js";
+import { bump, initUI } from "./ui.js";
 import { el, formatEUR, MAX_QTY, NAPA_EVERY_CENTS, PRICES_CENTS, showMessage, storage } from "./shared.js";
 
 mountEnvBanner();
 registerServiceWorker();
 hydrateIcons();
 mountFaq();
+initUI();
 
 // Auth wall: sin sesión o sin alta completa se redirige a acceso.html y se vuelve aquí después
 const { session, profile } = await requireCustomer();
@@ -45,7 +47,9 @@ function computeOrder() {
 
 function updateSummary() {
     const { totalCents, napaCount } = computeOrder();
-    $('totalPrice').textContent = formatEUR(totalCents);
+    const total = formatEUR(totalCents);
+    if ($('totalPrice').textContent !== total) bump($('totalPrice'));
+    $('totalPrice').textContent = total;
 
     const alertBox = $('napaAlert');
     alertBox.classList.toggle('is-success', napaCount > 0);
@@ -61,8 +65,10 @@ function updateSummary() {
 }
 
 function setQty(product, value) {
-    quantities[product] = Math.min(MAX_QTY, Math.max(0, value));
-    $(product).textContent = quantities[product];
+    const next = Math.min(MAX_QTY, Math.max(0, value));
+    if (next !== quantities[product]) bump($(product));
+    quantities[product] = next;
+    $(product).textContent = next;
 }
 
 form.addEventListener('click', event => {

@@ -2,6 +2,7 @@
 // Se abre desde cualquier elemento con el atributo data-open-faq.
 import { icon } from "./icons.js";
 import { CONTACT, DELIVERY_CENTS, el, formatEUR } from "./shared.js";
+import { closeDialog, enhanceDialog } from "./ui.js";
 
 function faqItem(iconName, question, ...body) {
     return el('details', { className: 'faq-item' },
@@ -33,8 +34,9 @@ function contactLinks() {
 function buildFaqDialog() {
     const dialog = el('dialog', { className: 'modal modal-faq', 'aria-labelledby': 'faqTitle' },
         el('div', { className: 'modal-header' },
-            el('h2', { id: 'faqTitle', text: 'Preguntas frecuentes' }),
-            el('button', { type: 'button', className: 'modal-close', 'aria-label': 'Cerrar', onClick: () => dialog.close() }, icon('close'))
+            // autofocus: al abrir, el foco va al título y no a la ✕ (evita el aro de foco y cierres accidentales)
+            el('h2', { id: 'faqTitle', tabindex: '-1', autofocus: true, text: 'Preguntas frecuentes' }),
+            el('button', { type: 'button', className: 'modal-close', 'aria-label': 'Cerrar', onClick: () => closeDialog(dialog) }, icon('close'))
         ),
         el('div', { className: 'faq-list' },
             faqItem('shield', '¿Qué hacemos con tus datos?',
@@ -66,10 +68,8 @@ function buildFaqDialog() {
         )
     );
 
-    // Cerrar al pulsar fuera del contenido (sobre el fondo oscuro)
-    dialog.addEventListener('click', event => {
-        if (event.target === dialog) dialog.close();
-    });
+    // Escape o pulsar sobre el fondo difuminado: cierre con animación
+    enhanceDialog(dialog);
     return dialog;
 }
 

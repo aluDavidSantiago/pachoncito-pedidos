@@ -14,11 +14,13 @@ import { hydrateIcons } from "./icons.js";
 import { isStandalone, mountInstallPrompt, registerServiceWorker } from "./pwa.js";
 import { endSession, getProfile, getSession, hasCompletedProfile, safeNext } from "./session.js";
 import { normalizePhone, showMessage, storage, withBusy } from "./shared.js";
+import { closeDialog, initUI } from "./ui.js";
 
 mountEnvBanner();
 registerServiceWorker();
 hydrateIcons();
 mountFaq();
+initUI();
 
 const $ = id => document.getElementById(id);
 const message = $('accessMessage');
@@ -176,7 +178,7 @@ function showProfileStep() {
 }
 
 $('infoBtn').addEventListener('click', () => $('infoModal').showModal());
-$('closeInfoBtn').addEventListener('click', () => $('infoModal').close());
+$('closeInfoBtn').addEventListener('click', () => closeDialog($('infoModal')));
 
 // Código propio de invitación: 3 letras del nombre + 4 caracteres sin ambigüedades (sin 0/O, 1/I)
 function makeReferralCode(name) {

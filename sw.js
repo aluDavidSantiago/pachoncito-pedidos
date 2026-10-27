@@ -2,7 +2,7 @@
 // Estrategia "red primero": siempre se sirve la versión publicada más reciente y la caché solo se usa sin conexión,
 // así nunca se mezclan archivos de versiones distintas tras un despliegue.
 // Sube CACHE_VERSION si cambias la lista de archivos de SHELL.
-const CACHE_VERSION = 'pachoncito-v3';
+const CACHE_VERSION = 'pachoncito-v4';
 
 const SHELL = [
     './',
@@ -12,7 +12,8 @@ const SHELL = [
     'resenas.html',
     'style.css',
     'manifest.json',
-    '1.png',
+    'icons/logo-blanco.png',
+    'icons/logo-tinta.png',
     'icons/icon-192.png',
     'icons/icon-512.png',
     'icons/favicon-dark-48.png',
@@ -30,6 +31,7 @@ const SHELL = [
     'firebase-config.js',
     'icons.js',
     'faq.js',
+    'ui.js',
     'pwa.js'
 ];
 
