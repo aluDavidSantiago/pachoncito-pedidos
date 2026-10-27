@@ -13,8 +13,10 @@ export function priceOrder(items, deliveryMethod) {
     return { subtotalCents, deliveryCents, totalCents, napaCount: Math.floor(totalCents / NAPA_EVERY_CENTS) };
 }
 
-export function buildOrder({ name, phone, items, deliveryMethod, address, slot, referralCode }) {
-    const order = {
+// uid = cuenta del cliente; phone = su teléfono/WhatsApp vinculado (contacto para la entrega)
+export function buildOrder({ uid, name, phone, items, deliveryMethod, address, slot, test }) {
+    return {
+        uid,
         customerName: name,
         phone,
         items: { clasico: items.clasico, bocadillo: items.bocadillo },
@@ -23,10 +25,9 @@ export function buildOrder({ name, phone, items, deliveryMethod, address, slot, 
         address: deliveryMethod === 'domicilio' ? address : PICKUP_ADDRESS,
         deliverySlot: slot,
         status: 'pending',
+        test: Boolean(test),
         createdAt: serverTimestamp()
     };
-    if (referralCode) order.referralCode = referralCode;
-    return order;
 }
 
 export function normalizeOrder(snap) {
@@ -34,15 +35,19 @@ export function normalizeOrder(snap) {
     return {
         ...data,
         id: snap.id,
-        // Compatibilidad con pedidos antiguos guardados en euros
+        // Compatibilidad con pedidos antiguos (en euros y sin cuenta de cliente)
         totalCents: Number.isInteger(data.totalCents) ? data.totalCents : Math.round((data.total || 0) * 100),
         napaCount: data.napaCount ?? (data.hasNapa ? 1 : 0),
-        phoneKey: normalizePhone(data.phone)
+        phoneKey: normalizePhone(data.phone),
+        uid: data.uid || null
     };
 }
 
-// Al entregar un pedido: se registra al cliente, se canjean sus ñapas acumuladas
-// y, si es su primera compra y trae código de referido válido, el recomendador gana 1 ñapa.
+// Al entregar un pedido (en una sola transacción):
+//  · el obrador confirma el teléfono del cliente (phoneVerified) — es la verificación antifraude;
+//  · se registra la compra (habilita sus reseñas) y se canjean sus ñapas acumuladas;
+//  · si es su primera compra y se dio de alta con un código de invitación, su recomendador gana 1 ñapa;
+//  · si existía un expediente antiguo con su teléfono (antes de las cuentas de Google), se fusiona.
 export function completeOrder(db, orderId) {
     return runTransaction(db, async tx => {
         const orderRef = doc(db, 'orders', orderId);
@@ -52,45 +57,66 @@ export function completeOrder(db, orderId) {
         if (order.status === 'completed') return null;
 
         const orderUpdate = { status: 'completed', completedAt: serverTimestamp() };
-        if (!order.phoneKey) {
+        if (!order.uid) {
             tx.update(orderRef, orderUpdate);
-            return { warning: 'El teléfono no es válido: no se pudo registrar al cliente.' };
+            return { warning: 'Pedido antiguo sin cuenta de cliente: se marca como entregado sin registrar ñapas.' };
         }
 
-        const customerRef = doc(db, 'customers', order.phoneKey);
+        // ---- Lecturas (todas antes de cualquier escritura) ----
+        const customerRef = doc(db, 'customers', order.uid);
         const customerSnap = await tx.get(customerRef);
-        const customer = customerSnap.exists() ? customerSnap.data() : null;
-        const isFirstPurchase = !customer?.completedOrders;
+        if (!customerSnap.exists()) {
+            tx.update(orderRef, orderUpdate);
+            return { warning: 'No se encontró la cuenta del cliente: se marca como entregado sin registrar ñapas.' };
+        }
+        const customer = customerSnap.data();
+        const isFirstPurchase = !customer.completedOrders;
+
+        // Expediente antiguo (customers/{teléfono}) de antes de las cuentas de Google
+        let legacyRef = null;
+        let legacy = null;
+        if (customer.phone && !customer.legacyMerged) {
+            legacyRef = doc(db, 'customers', customer.phone);
+            const legacySnap = await tx.get(legacyRef);
+            if (legacySnap.exists() && !legacySnap.data().migratedTo) legacy = legacySnap.data();
+        }
 
         let referrerRef = null;
         let referrer = null;
-        const referrerPhone = normalizePhone(order.referralCode);
-        if (isFirstPurchase && referrerPhone && referrerPhone !== order.phoneKey && !order.referralRewarded) {
-            referrerRef = doc(db, 'customers', referrerPhone);
-            const referrerSnap = await tx.get(referrerRef);
-            // Solo cuenta si el recomendador ya es cliente con alguna compra entregada
-            if (referrerSnap.exists() && referrerSnap.data().completedOrders > 0) referrer = referrerSnap.data();
+        if (isFirstPurchase && !legacy?.completedOrders && customer.referredByCode && !customer.referralRewarded) {
+            const codeSnap = await tx.get(doc(db, 'referralCodes', customer.referredByCode));
+            const referrerUid = codeSnap.exists() ? codeSnap.data().uid : null;
+            if (referrerUid && referrerUid !== order.uid) {
+                referrerRef = doc(db, 'customers', referrerUid);
+                const referrerSnap = await tx.get(referrerRef);
+                const candidate = referrerSnap.exists() ? referrerSnap.data() : null;
+                // Solo cuenta si el recomendador ya tiene alguna compra entregada y ambos son del mismo tipo (real/prueba)
+                if (candidate?.completedOrders > 0 && Boolean(candidate.test) === Boolean(customer.test)) referrer = candidate;
+            }
         }
 
-        const purchased = customer?.purchased || {};
-        const creditsRedeemed = customer?.napaCredits || 0;
-        const customerData = {
-            name: order.customerName || customer?.name || '',
-            phone: order.phoneKey,
-            completedOrders: (customer?.completedOrders || 0) + 1,
-            totalSpentCents: (customer?.totalSpentCents || 0) + order.totalCents,
+        // ---- Escrituras ----
+        const purchased = customer.purchased || {};
+        const legacyPurchased = legacy?.purchased || {};
+        const creditsRedeemed = (customer.napaCredits || 0) + (legacy?.napaCredits || 0);
+        const customerUpdate = {
+            completedOrders: (customer.completedOrders || 0) + (legacy?.completedOrders || 0) + 1,
+            totalSpentCents: (customer.totalSpentCents || 0) + (legacy?.totalSpentCents || 0) + order.totalCents,
             purchased: {
-                clasico: (purchased.clasico || 0) + (order.items?.clasico || 0),
-                bocadillo: (purchased.bocadillo || 0) + (order.items?.bocadillo || 0)
+                clasico: (purchased.clasico || 0) + (legacyPurchased.clasico || 0) + (order.items?.clasico || 0),
+                bocadillo: (purchased.bocadillo || 0) + (legacyPurchased.bocadillo || 0) + (order.items?.bocadillo || 0)
             },
             napaCredits: 0,
+            phoneVerified: true,
             updatedAt: serverTimestamp()
         };
-        if (!customer) customerData.createdAt = serverTimestamp();
-        if (referrer) customerData.referredBy = referrerPhone;
-        tx.set(customerRef, customerData, { merge: true });
-
+        if (legacy) {
+            customerUpdate.legacyMerged = true;
+            if (legacy.feedbackRewarded) customerUpdate.feedbackRewarded = true;
+            tx.update(legacyRef, { migratedTo: order.uid, updatedAt: serverTimestamp() });
+        }
         if (referrer) {
+            customerUpdate.referralRewarded = true;
             tx.update(referrerRef, {
                 napaCredits: (referrer.napaCredits || 0) + 1,
                 referralsCount: (referrer.referralsCount || 0) + 1,
@@ -98,9 +124,10 @@ export function completeOrder(db, orderId) {
             });
             orderUpdate.referralRewarded = true;
         }
+        tx.update(customerRef, customerUpdate);
 
         orderUpdate.creditsRedeemed = creditsRedeemed;
         tx.update(orderRef, orderUpdate);
-        return { creditsRedeemed, referrerRewarded: Boolean(referrer) };
+        return { creditsRedeemed, referrerRewarded: Boolean(referrer), legacyMerged: Boolean(legacy) };
     });
 }

@@ -4,7 +4,7 @@ import { db } from "./firebase.js";
 import { buildOrder, priceOrder } from "./orders.js";
 import { mountInstallPrompt, registerServiceWorker } from "./pwa.js";
 import { requireCustomer } from "./session.js";
-import { el, formatEUR, MAX_QTY, NAPA_EVERY_CENTS, normalizePhone, PRICES_CENTS, showMessage, storage } from "./shared.js";
+import { el, formatEUR, MAX_QTY, NAPA_EVERY_CENTS, PRICES_CENTS, showMessage, storage } from "./shared.js";
 
 mountEnvBanner();
 registerServiceWorker();
@@ -47,12 +47,12 @@ function updateSummary() {
     alertBox.classList.toggle('is-success', napaCount > 0);
     if (napaCount > 0) {
         alertBox.replaceChildren(
-            '🎉 ¡Felicidades! Te has ganado ',
-            el('strong', { text: `${napaCount} ${napaCount === 1 ? 'Ñapa gratis' : 'Ñapas gratis'}` }),
-            ' 🥖✨'
+            'Con este pedido te llevas ',
+            el('strong', { text: `${napaCount} ${napaCount === 1 ? 'ñapa de regalo' : 'ñapas de regalo'}` }),
+            ': pandebonos extra, invitación de la casa.'
         );
     } else {
-        alertBox.textContent = `🎁 ¡Añade ${formatEUR(NAPA_EVERY_CENTS - totalCents)} más para llevarte tu primera Ñapa gratis!`;
+        alertBox.textContent = `Te faltan ${formatEUR(NAPA_EVERY_CENTS - totalCents)} para llevarte una ñapa de regalo.`;
     }
 }
 
@@ -78,19 +78,12 @@ function toggleDireccion() {
 
 $('tipoEntrega').addEventListener('change', toggleDireccion);
 
-// Datos del expediente del cliente; el teléfono es siempre el verificado de la sesión
-const isFirstOrder = !profile.completedOrders;
-
+// Datos del expediente; el teléfono es siempre el vinculado a la cuenta (las reglas lo exigen)
 function prefill() {
     const savedUser = storage.get('pachoncito_user') || {};
     $('nombre').value = profile.name || savedUser.name || '';
-    $('telefono').value = session.phone;
+    $('telefono').value = profile.phone;
     $('direccion').value = savedUser.address || profile.address || '';
-    // El referido solo tiene sentido en el primer pedido (enlace ?ref= o el indicado en el alta)
-    const referral = isFirstOrder
-        ? new URLSearchParams(location.search).get('ref') || profile.referralCode || storage.get('pachoncito_ref')
-        : null;
-    $('referido').value = referral || '';
 }
 
 function fail(text, field) {
@@ -104,50 +97,44 @@ form.addEventListener('submit', async event => {
     showMessage(message, '');
 
     const nombre = $('nombre').value.trim();
-    const phone = session.phone;
     const direccion = $('direccion').value.trim();
     const hora = $('hora').value;
-    const referralRaw = $('referido').value.trim();
-    const referralCode = referralRaw ? normalizePhone(referralRaw) : null;
     const order = computeOrder();
 
     if (nombre.length < 2) return fail('Escribe tu nombre y apellidos.', $('nombre'));
     if (quantities.clasico + quantities.bocadillo === 0) return fail('Selecciona al menos un pandebono para tu pedido.');
     if (order.deliveryMethod === 'domicilio' && direccion.length < 5) return fail('Introduce tu dirección exacta en Premià de Mar.', $('direccion'));
     if (!hora) return fail('Selecciona una hora de entrega.', $('hora'));
-    if (referralRaw && !referralCode) return fail('El código de referido debe ser un teléfono válido.', $('referido'));
-    if (referralCode === phone) return fail('No puedes usar tu propio teléfono como código de referido.', $('referido'));
 
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Guardando pedido… ⏳';
+    submitBtn.textContent = 'Guardando pedido…';
 
     try {
         await addDoc(collection(db, 'orders'), buildOrder({
+            uid: session.uid,
             name: nombre,
-            phone,
+            phone: profile.phone,
             items: quantities,
             deliveryMethod: order.deliveryMethod,
             address: direccion,
             slot: hora,
-            referralCode
+            test: session.isTest
         }));
 
         const savedUser = storage.get('pachoncito_user') || {};
-        storage.set('pachoncito_user', { ...savedUser, name: nombre, phone, address: direccion || savedUser.address || '' });
-        storage.remove('pachoncito_ref');
+        storage.set('pachoncito_user', { ...savedUser, name: nombre, address: direccion || savedUser.address || '' });
 
         form.reset();
         setQty('clasico', 0);
         setQty('bocadillo', 0);
         prefill();
-        $('referido').value = '';
         toggleDireccion();
 
-        showMessage(message, `¡Pedido realizado con éxito, ${nombre}! Nos vemos este domingo 🥖🔥 Puedes seguirlo en «Mi cuenta».`, 'success');
+        showMessage(message, `Pedido reservado, ${nombre.split(' ')[0]}. Te esperamos el domingo; puedes seguirlo en «Mi cuenta».`, 'success');
         message.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } catch (error) {
         console.error('Error al guardar el pedido:', error);
-        fail('Hubo un error al procesar tu reserva. Revisa los datos e inténtalo de nuevo.');
+        fail('No hemos podido guardar tu pedido. Revisa la conexión y vuelve a intentarlo; si sigue fallando, escríbenos.');
     } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = SUBMIT_LABEL;

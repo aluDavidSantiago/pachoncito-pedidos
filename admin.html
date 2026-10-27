@@ -97,19 +97,39 @@
                 <p class="loading-state">Cargando reseñas…</p>
             </div>
 
+            <details class="panel-box admin-tools">
+                <summary>📱 Teléfonos vinculados</summary>
+                <div class="form-section">
+                    <p class="section-desc">
+                        Cada teléfono solo puede estar vinculado a una cuenta. Si un cliente dice que su número lo tiene
+                        otra cuenta, compruébalo con él por WhatsApp y libéralo aquí: la otra cuenta tendrá que vincular
+                        un teléfono nuevo antes de volver a pedir.
+                    </p>
+                    <div class="field">
+                        <label for="releasePhone">Teléfono a liberar</label>
+                        <input type="tel" id="releasePhone" inputmode="tel" placeholder="600 000 000">
+                    </div>
+                    <div class="actions-bar">
+                        <button type="button" id="releasePhoneBtn" class="btn btn-small btn-danger">🔓 Liberar teléfono</button>
+                    </div>
+                    <p id="releaseMessage" class="form-message" role="status" aria-live="polite" hidden></p>
+                </div>
+            </details>
+
             <details class="panel-box test-tools">
                 <summary>🧪 Datos de prueba</summary>
                 <div class="form-section">
                     <p class="section-desc">
                         Genera un escenario completo en <strong id="testTarget"></strong>: pedidos en todos los estados,
-                        clientes con compras, un referido ya premiado (Bruno → Ana), otro pendiente (Carla → Bruno),
-                        uno inválido (Elena → Fran) y reseñas de prueba. Regenerar borra antes los datos de prueba anteriores.
-                        Solo afecta a los teléfonos de prueba; los pedidos reales no se tocan.
+                        clientes con compras, una invitación ya premiada (Bruno → Ana), otra pendiente (Carla → Bruno),
+                        una que no premia porque el recomendador no tiene compras (Elena → Fran) y reseñas de prueba.
+                        Regenerar borra antes los datos de prueba anteriores. Solo afecta a datos marcados como prueba.
                     </p>
                     <ul id="testAccounts" class="test-accounts"></ul>
                     <p class="hint">
-                        Para entrar como estos clientes en «Mi cuenta» o «Reseñas» usa el código <strong id="testOtp"></strong>.
-                        +34 600 000 000 queda libre para probar como cliente nuevo.
+                        Para probar como cliente desde el móvil: abre la web con <strong>?pruebas=1</strong> y pulsa
+                        «Entrar como cliente de prueba» (cuenta anónima). Al darte de alta usa un teléfono de prueba
+                        (<span id="testPhones"></span>). «Borrar datos de prueba» elimina también esas cuentas.
                     </p>
                     <div class="actions-bar">
                         <button type="button" id="seedBtn" class="btn btn-small">🧪 Generar / regenerar datos de prueba</button>

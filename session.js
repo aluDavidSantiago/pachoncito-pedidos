@@ -1,58 +1,32 @@
 // Sesión del cliente y "auth wall" de las páginas de cliente.
-// La guardia es la capa de experiencia: la seguridad real está en firestore.rules (canActAs).
+// La guardia es la capa de experiencia: la seguridad real está en firestore.rules.
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { auth } from "./auth.js";
-import { isTestPhone } from "./env.js";
 import { db } from "./firebase.js";
-import { storage } from "./shared.js";
 
-const TEST_SESSION_KEY = 'pachoncito_test_session';
-
-// ---------- Sesiones de prueba (sin SMS, solo teléfonos de prueba) ----------
-
-export function startTestSession(phone) {
-    if (isTestPhone(phone)) storage.set(TEST_SESSION_KEY, phone);
-}
-
-function readTestSession() {
-    const phone = storage.get(TEST_SESSION_KEY);
-    return isTestPhone(phone) ? phone : null;
-}
-
-// ---------- Sesión actual ----------
-
-// { phone, uid, isTest, isTestSession } o null. Firebase recuerda la sesión real entre visitas
-// (también al abrir la app instalada), así que el cliente solo verifica su móvil una vez.
+// { uid, user, isTest } o null. Firebase recuerda la sesión entre visitas (también en la app instalada).
+// isTest: sesión anónima del modo pruebas; las reglas obligan a marcar todo lo que cree como prueba.
 export function getSession() {
     return new Promise(resolve => {
         const unsubscribe = onAuthStateChanged(auth, user => {
             unsubscribe();
-            const testPhone = readTestSession();
-            if (testPhone) {
-                resolve({ phone: testPhone, uid: 'test', isTest: true, isTestSession: true });
-            } else if (user?.phoneNumber) {
-                resolve({ phone: user.phoneNumber, uid: user.uid, isTest: isTestPhone(user.phoneNumber), isTestSession: false });
-            } else {
-                resolve(null);
-            }
+            resolve(user ? { uid: user.uid, user, isTest: user.isAnonymous } : null);
         });
     });
 }
 
-export async function endSession() {
-    storage.remove(TEST_SESSION_KEY);
-    await signOut(auth);
-}
+export const endSession = () => signOut(auth);
 
-// ---------- Expediente del cliente (customers/{teléfono}) ----------
+// ---------- Expediente del cliente (customers/{uid}) ----------
 
-export async function getProfile(phone) {
-    const snap = await getDoc(doc(db, 'customers', phone));
+export async function getProfile(uid) {
+    const snap = await getDoc(doc(db, 'customers', uid));
     return snap.exists() ? snap.data() : null;
 }
 
-export const hasCompletedProfile = profile => Boolean(profile?.name);
+// Alta completa = nombre + teléfono vinculado (el teléfono puede quedar vacío si el obrador lo libera)
+export const hasCompletedProfile = profile => Boolean(profile?.name && profile?.phone);
 
 // ---------- Guardia de navegación ----------
 
@@ -73,14 +47,14 @@ export function loginUrl(next = currentRoute()) {
 }
 
 // Devuelve { session, profile } o redirige a acceso.html y vuelve aquí tras autenticarse.
-// También exige el alta completa (expediente con nombre) antes de entrar.
+// También exige el alta completa (expediente con nombre y teléfono) antes de entrar.
 export async function requireCustomer() {
     const session = await getSession();
     if (!session) return redirectToLogin();
 
     let profile = null;
     try {
-        profile = await getProfile(session.phone);
+        profile = await getProfile(session.uid);
     } catch (error) {
         console.error('No se pudo leer el expediente del cliente:', error);
     }

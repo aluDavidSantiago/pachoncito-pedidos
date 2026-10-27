@@ -16,15 +16,13 @@ const $ = id => document.getElementById(id);
 const form = $('ratingForm');
 const message = $('reviewMessage');
 
-// Identidad de quien valora. Cuenta real: id "<uid>_<producto>". Sesión de prueba sin SMS: id "test_<teléfono>_<producto>".
-// En ambos casos las reglas garantizan una reseña por producto y que "test" diga la verdad.
-const reviewer = session.isTestSession
-    ? { phone: session.phone, uid: 'test', test: true, reviewId: product => `test_${session.phone}_${product}` }
-    : { phone: session.phone, uid: session.uid, test: session.isTest, reviewId: product => `${session.uid}_${product}` };
+// Una reseña por cliente y producto: id "<uid>_<producto>" (el Clásico y el Bocadillo se valoran por separado).
+// Las cuentas de prueba (anónimas) usan el mismo esquema; las reglas obligan a marcar sus reseñas como prueba.
+const reviewId = product => `${session.uid}_${product}`;
 
-$('signedInAs').textContent = session.isTestSession
-    ? `🧪 Sesión de prueba sin SMS: ${session.phone}`
-    : `Valorando como cliente verificado (${session.phone})`;
+$('signedInAs').textContent = session.isTest
+    ? '🧪 Valorando con una cuenta de prueba'
+    : 'Tu reseña se publica sin tu nombre ni tus datos.';
 
 // ---------- Reseñas públicas (anónimas) ----------
 
@@ -113,7 +111,7 @@ async function markReviewedProducts() {
         const input = form.querySelector(`input[name="product"][value="${product}"]`);
         let done = false;
         try {
-            done = (await getDoc(doc(db, 'reviews', reviewer.reviewId(product)))).exists();
+            done = (await getDoc(doc(db, 'reviews', reviewId(product)))).exists();
         } catch (error) {
             console.error('Error comprobando reseñas previas:', error);
         }
@@ -140,27 +138,27 @@ form.addEventListener('submit', async event => {
     }
 
     // La reseña pública no lleva datos personales; el vínculo con el teléfono va aparte y es privado
-    const reviewId = reviewer.reviewId(product);
+    const id = reviewId(product);
     const batch = writeBatch(db);
-    batch.set(doc(db, 'reviews', reviewId), {
+    batch.set(doc(db, 'reviews', id), {
         product, ratings, comment,
-        test: reviewer.test,
+        test: session.isTest,
         rewarded: false,
         createdAt: serverTimestamp()
     });
-    batch.set(doc(db, 'reviewAuthors', reviewId), { uid: reviewer.uid, phone: reviewer.phone, product });
+    batch.set(doc(db, 'reviewAuthors', id), { uid: session.uid, product });
 
     try {
         await withBusy($('submitReviewBtn'), 'Publicando…', () => batch.commit());
         form.reset();
         await markReviewedProducts();
-        showMessage(message, reviewer.test
+        showMessage(message, session.isTest
             ? '🧪 Reseña de prueba publicada. Solo se ve en modo pruebas (?pruebas=1) y en el panel.'
             : '¡Gracias por tu valoración! 🎁 Revisaremos tu reseña y te guardaremos una ñapa para tu próximo pedido.', 'success');
         loadReviews();
     } catch (error) {
         console.error('Error al publicar la reseña:', error);
-        const hint = reviewer.test ? ' ¿Has generado los datos de prueba en el panel?' : '';
+        const hint = session.isTest ? ' Una cuenta de prueba solo puede valorar tras una entrega (márcala como Entregado en el panel).' : '';
         showMessage(message, error.code === 'permission-denied'
             ? `No podemos publicarla: solo pueden valorar clientes con un pedido entregado de ese producto, y una sola vez por producto.${hint}`
             : 'No se pudo publicar la valoración. Inténtalo de nuevo.', 'error');

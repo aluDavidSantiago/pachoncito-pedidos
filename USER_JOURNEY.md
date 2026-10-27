@@ -5,10 +5,10 @@ Los diagramas usan [Mermaid](https://mermaid.js.org/) (GitHub los dibuja automá
 
 | Perfil | Puerta de entrada | Identidad | Dónde se guarda |
 |---|---|---|---|
-| Cliente nuevo | Enlace externo (WhatsApp, Instagram, `index.html?ref=…`) | Móvil verificado por SMS (Firebase Auth) | `customers/{teléfono}` + `orders/{id}` |
-| Cliente recurrente | App instalada (PWA `standalone`) o navegador | Sesión de Firebase recordada en el dispositivo | Lee su expediente y sus pedidos |
-| Administrador | `admin.html` | Email y contraseña (Firebase Auth) + documento `admins/{uid}` | Gestiona todo |
-| Pruebas | Cualquiera de las anteriores con `?pruebas=1` | Teléfonos de prueba sin SMS (`+34 600 000 000–006`, `+34 600 023 456`, código `123456`) | Datos marcados como prueba |
+| Cliente nuevo | Enlace externo (WhatsApp, Instagram, `index.html?ref=ANA-7K3P`) | Cuenta de Google (UID de Firebase) + teléfono vinculado una sola vez | `customers/{uid}`, `phoneClaims/{teléfono}`, `referralCodes/{código}`, `orders/{id}` |
+| Cliente recurrente | App instalada (PWA `standalone`) o navegador | Sesión de Google recordada en el dispositivo | Lee su expediente y sus pedidos |
+| Administrador | `admin.html` | Email y contraseña en una **instancia de Firebase aislada** + documento `admins/{uid}` | Gestiona todo |
+| Pruebas | `?pruebas=1` | Sesión **anónima** real de Firebase + teléfonos de prueba (`+34 600 000 xxx`, `+34 600 023 456`) | Todo marcado con `test: true` |
 
 ---
 
@@ -16,13 +16,15 @@ Los diagramas usan [Mermaid](https://mermaid.js.org/) (GitHub los dibuja automá
 
 ```mermaid
 flowchart LR
-    subgraph Cliente["Páginas de cliente (protegidas por el auth wall)"]
+    subgraph Cliente["Instancia de Firebase de clientes (firebase.js / auth.js)"]
         IDX["index.html<br/>Carta y pedido"]
-        CTA["cuenta.html<br/>Ñapas, historial, referidos"]
+        CTA["cuenta.html<br/>Ñapas, historial, invitaciones"]
         RES["resenas.html<br/>Valoraciones"]
+        ACC["acceso.html<br/>Google + alta"]
     end
-    ACC["acceso.html<br/>Auth wall + alta"]
-    ADM["admin.html<br/>Panel del obrador"]
+    subgraph Obrador["Instancia aislada 'obrador' (admin-firebase.js)"]
+        ADM["admin.html<br/>Panel del obrador"]
+    end
 
     IDX <--> CTA
     IDX <--> RES
@@ -31,13 +33,13 @@ flowchart LR
     CTA -. sin sesión .-> ACC
     RES -. sin sesión .-> ACC
     ACC -- "vuelve a ?next=" --> IDX
-    ADM ~~~ ACC
 ```
 
 | Archivo | Papel en los recorridos |
 |---|---|
-| `session.js` | Guardia de navegación (`requireCustomer`), sesión real o de prueba, lectura del expediente, `safeNext` (anti redirección abierta) |
-| `acceso.js` | Verificación del móvil, alta del cliente, invitación a instalar y vuelta a la página de origen |
+| `session.js` | Guardia de navegación (`requireCustomer`), lectura del expediente, `safeNext` (anti redirección abierta) |
+| `acceso.js` | Google Sign-In (popup), aviso de navegador interno, alta con vinculación del teléfono, invitación a instalar |
+| `admin-firebase.js` | Instancia `obrador`: la sesión del panel nunca se mezcla con la de un cliente en el mismo navegador |
 | `pwa.js` + `sw.js` + `manifest.json` | App instalable, carcasa sin conexión, invitación de instalación (Android e iOS) |
 | `firestore.rules` | La seguridad real: aunque alguien se salte la guardia del navegador, la base de datos rechaza lo que no le corresponde |
 
@@ -47,51 +49,32 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    A["📲 Enlace externo<br/>index.html?ref=600123456"] --> B{"session.js<br/>¿hay sesión?"}
+    A["📲 Enlace externo<br/>index.html?ref=ANA-7K3P"] --> B{"session.js<br/>¿hay sesión?"}
     B -- No --> C["acceso.html?next=index.html%3Fref%3D…<br/>(el destino original viaja en ?next)"]
-    C --> D["Paso 1 · Teléfono"]
-    D --> E{"¿Teléfono de prueba<br/>o ?pruebas=1?"}
-    E -- "Teléfono de prueba" --> F["Código 123456 ya rellenado<br/>(sin reCAPTCHA ni SMS)"]
-    E -- "?pruebas=1 + número real" --> D2["Aviso: usa un teléfono de prueba"] --> D
-    E -- "Número real" --> G["reCAPTCHA invisible + SMS de Firebase"]
-    F --> H["Paso 2 · Verificar código"]
-    G --> H
-    H --> I{"¿Existe customers/{teléfono}<br/>con nombre?"}
-    I -- Sí --> Z["Vuelve a ?next"]
-    I -- No --> J["Paso 3 · Onboarding<br/>nombre, dirección, recomendador<br/>(precargado desde ?ref)"]
-    J --> K["setDoc customers/{teléfono}<br/>(expediente del cliente)"]
-    K --> L["Paso 4 · ¡Todo listo!<br/>Invitación a instalar la PWA"]
-    L --> Z
-    Z --> M["index.html<br/>teléfono fijado al verificado,<br/>nombre y referido precargados"]
-    M --> N["addDoc orders/{id}<br/>primer pedido (status: pending)"]
+    C --> D{"¿Navegador interno<br/>de Instagram/Facebook?"}
+    D -- Sí --> D1["«Ábrelo en tu navegador»<br/>Abrir en Chrome · Copiar enlace"]
+    D -- No --> E["Continuar con Google<br/>(signInWithPopup)"]
+    D1 --> E
+    E --> F{"¿Existe customers/{uid}<br/>con nombre y teléfono?"}
+    F -- Sí --> Z["Vuelve a ?next"]
+    F -- No --> G["Alta: nombre (de Google), teléfono/WhatsApp,<br/>dirección, código de invitación (de ?ref)"]
+    G --> H["Un único lote en Firestore:<br/>customers/{uid} + phoneClaims/{teléfono} + referralCodes/{código propio}"]
+    H -- "teléfono ya vinculado a otra cuenta" --> G2["«Ese teléfono ya está vinculado…<br/>escríbenos por WhatsApp»"]
+    H -- OK --> I["Cuenta creada<br/>Invitación a instalar la PWA"]
+    I --> Z
+    Z --> M["index.html<br/>teléfono vinculado fijo, nombre precargado"]
+    M --> N["addDoc orders/{id}<br/>uid + teléfono vinculado (status: pending)"]
 ```
 
 | # | Pantalla | Qué ve el cliente | Qué ocurre por debajo | Regla que lo protege |
 |---|---|---|---|---|
-| 1 | Cualquier página de cliente | Nada (la página está oculta con `.auth-pending`) | `requireCustomer()` no encuentra sesión y redirige con `location.replace` | — |
-| 2 | `acceso.html` · Teléfono | Campo de móvil | Teléfono de prueba → sin SMS. Número real → `signInWithPhoneNumber` | — |
-| 3 | `acceso.html` · Código | Código de 6 dígitos | Sesión real de Firebase o sesión de prueba (`localStorage`) | — |
-| 4 | `acceso.html` · Alta | Nombre, apellidos, dirección, recomendador | `setDoc(customers/{teléfono})` con `name`, `phone`, `address`, `referralCode?` | `validProfile`: solo su propio teléfono, sin ñapas ni compras |
+| 1 | Cualquier página de cliente | Nada (oculta con `.auth-pending`) | `requireCustomer()` no encuentra sesión y redirige con `location.replace` | — |
+| 2 | `acceso.html` · Navegador interno | Instrucciones para abrir en Chrome/Safari | Detección por `userAgent` (Google bloquea su login en WebViews) | — |
+| 3 | `acceso.html` · Google | Ventana de Google | `signInWithPopup` (el redirect falla en GitHub Pages por ser otro dominio) | — |
+| 4 | `acceso.html` · Alta | Nombre, teléfono, dirección, código de invitación | Lote: perfil + cerrojo del teléfono + código propio | `validNewCustomer` + `validClaim`: teléfono libre, email = el de Google, sin ñapas ni compras |
 | 5 | `acceso.html` · Bienvenida | Tarjeta «Instala Pachoncito» | Android: `beforeinstallprompt`. iOS: guía de 2 pasos | — |
-| 6 | `index.html` | Carta con sus datos | `buildOrder()` + `addDoc(orders)` | `validNewOrder` + `canActAs(phone)`: solo a su propio teléfono |
-| 7 | Panel (más tarde) | — | Al entregar: compra registrada; si vino recomendado, su recomendador gana 1 ñapa | Solo el obrador escribe ñapas |
-
-**Invitación a instalar (paso 5):**
-
-```
-┌──────────────────────────────────────────────┐
-│ [icono]  📲 Instala Pachoncito            ✕  │   Android / Chrome
-│          Pide en un toque desde tu inicio.   │   (beforeinstallprompt)
-│          [ Instalar app ]                    │
-└──────────────────────────────────────────────┘
-┌──────────────────────────────────────────────┐
-│ [icono]  📲 Añade Pachoncito a tu inicio  ✕  │   Safari / iOS
-│          1. Pulsa Compartir ⎙                │   (guía de 2 pasos)
-│          2. «Añadir a pantalla de inicio»    │
-└──────────────────────────────────────────────┘
-```
-
-Si se descarta con ✕, no vuelve a aparecer en 14 días (salvo justo después del alta). Nunca aparece dentro de la app ya instalada.
+| 6 | `index.html` | Carta con sus datos | `buildOrder()` + `addDoc(orders)` | `validNewOrder` + uid propio + teléfono = el vinculado |
+| 7 | Panel (al entregar) | — | El obrador confirma el teléfono (`phoneVerified`); si vino invitado, su recomendador gana 1 ñapa | Solo el obrador escribe ñapas y verificación |
 
 ---
 
@@ -99,27 +82,28 @@ Si se descarta con ✕, no vuelve a aparecer en 14 días (salvo justo después d
 
 ```mermaid
 flowchart TD
-    A["🏠 Icono en la pantalla de inicio<br/>(manifest: display standalone)"] --> B["start_url: index.html?source=pwa<br/>sin barras del navegador"]
+    A["🏠 Icono en la pantalla de inicio<br/>(manifest: display standalone)"] --> B["start_url: index.html?source=pwa"]
     B --> C["sw.js: red primero<br/>(sin conexión → carcasa en caché)"]
-    C --> D{"session.js<br/>¿sesión recordada?"}
-    D -- "Sí (Firebase la guarda en el dispositivo)" --> E["Lee customers/{teléfono}"]
-    D -- "No (sesión cerrada o borrada)" --> X["acceso.html → solo verificación,<br/>sin alta (ya tiene expediente)"] --> E
-    E --> F["index.html · Carta<br/>👤 Nombre · 🎁 saldo de ñapas"]
-    F --> G["cuenta.html · Mi cuenta"]
-    F --> H["resenas.html · Valorar"]
-    G --> G1["🎁 Ñapas acumuladas<br/>(napaCredits)"]
-    G --> G2["📦 Historial<br/>where phone == su teléfono"]
-    G --> G3["🔗 Compartir enlace<br/>index.html?ref=su teléfono"]
-    H --> H1["Una reseña por producto,<br/>solo si lo compró"]
+    C --> D{"session.js<br/>¿sesión de Google recordada?"}
+    D -- Sí --> E["Lee customers/{uid}"]
+    D -- No --> X["acceso.html → Continuar con Google<br/>(sin alta: ya tiene expediente)"] --> E
+    E --> E2{"¿Teléfono vinculado?"}
+    E2 -- "No (el obrador lo liberó)" --> X2["acceso.html → Vincula tu teléfono"] --> E
+    E2 -- Sí --> F["index.html · Carta<br/>👤 Nombre · 🎁 saldo de ñapas"]
+    F --> G["cuenta.html"]
+    F --> H["resenas.html"]
+    G --> G1["🎁 Ñapas acumuladas"]
+    G --> G2["📦 Historial (where uid == su uid)"]
+    G --> G3["🔗 Código de invitación + enlace ?ref="]
+    H --> H1["Clásico y Bocadillo por separado:<br/>id uid_producto, solo con compra entregada"]
 ```
 
 | Sección | Datos | Origen | Regla |
 |---|---|---|---|
-| Cabecera de la carta | Nombre y saldo de ñapas | `customers/{teléfono}` | `allow get: if canActAs(phone)` |
-| Mi cuenta · Ñapas | `napaCredits`, `completedOrders`, `referralsCount` | `customers/{teléfono}` | Solo lectura para el cliente |
-| Mi cuenta · Historial | Sus pedidos con estado (Pendiente → En preparación → Listo → Entregado) | `orders` filtrado por su teléfono | `allow read: if canActAs(resource.data.phone)` |
-| Mi cuenta · Referidos | Enlace `index.html?ref=…` (Web Share API o portapapeles) | — | — |
-| Reseñas | Formulario + reseñas anónimas | `reviews` + `reviewAuthors` | Compra previa del producto, 1 por producto, `test` obligatorio y veraz |
+| Cabecera de la carta | Nombre y saldo de ñapas | `customers/{uid}` | `allow get: if isOwner(uid)` |
+| Mi cuenta | Ñapas, entregas, invitados, teléfono (confirmado o no), código | `customers/{uid}` | Solo lectura para el cliente (salvo nombre y dirección) |
+| Historial | Sus pedidos con estado | `orders` filtrado por `uid` | `allow read: if resource.data.uid == request.auth.uid` |
+| Reseñas | Formulario + reseñas anónimas | `reviews` + `reviewAuthors` | Compra previa del producto, una por producto, `test` veraz |
 
 ---
 
@@ -127,38 +111,35 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A["admin.html<br/>(noindex, fuera de la PWA y de la caché)"] --> B["Login email + contraseña"]
+    A["admin.html<br/>(noindex, fuera de la PWA y de la caché)"] --> B["Login email + contraseña<br/>en la instancia aislada 'obrador'"]
     B --> C{"¿Existe admins/{uid}?"}
-    C -- No --> B2["«Esta cuenta no tiene permisos»"] --> B
+    C -- No --> B2["Cierra esa sesión:<br/>«Esta cuenta no tiene permisos»"] --> B
     C -- Sí --> D["Panel en tiempo real (onSnapshot)<br/>orders · customers · reviews"]
-    D --> E["Producción y finanzas<br/>lista de la compra, inversión, beneficio"]
-    D --> F["Pedidos"]
-    F --> F1["Pendiente"] --> F2["Preparando"] --> F3["Listo"] --> F4["Entregado"]
-    F4 --> T["completeOrder() en una transacción:<br/>· registra la compra en customers<br/>· canjea las ñapas acumuladas<br/>· premia al recomendador (1.ª compra)"]
-    F -.-> FR["Rechazar / Borrar"]
-    D --> G["Reseñas: premiar con ñapa / eliminar"]
-    D --> H["🧪 Datos de prueba"]
-    H --> H1["Generar / regenerar escenario<br/>(seeder.js con la lógica real)"]
-    H --> H2["Borrar datos de prueba"]
+    D --> F["Pedidos: Pendiente → Preparando → Listo → Entregado"]
+    F --> T["completeOrder() en una transacción:<br/>· confirma el teléfono (phoneVerified)<br/>· registra la compra y canjea ñapas<br/>· premia al recomendador (1.ª compra)<br/>· fusiona el expediente antiguo por teléfono"]
+    D --> G["Reseñas: premiar (solo teléfono confirmado) / eliminar"]
+    D --> P["📱 Teléfonos vinculados: liberar un número"]
+    D --> H["🧪 Datos de prueba: generar / borrar"]
 ```
 
 | Paso | Acción | Detalle |
 |---|---|---|
-| Acceso | `signInWithEmailAndPassword` | La cuenta se crea en la consola de Firebase y el permiso con el documento `admins/{uid}` (las reglas impiden crearlo desde la web) |
-| Pedidos | Botones de estado | «Entregado» es definitivo y ejecuta `completeOrder()` (`orders.js`) |
-| Ñapas | Automáticas al entregar | Volumen (1 cada 10 €), referido (1.ª compra del recomendado), feedback (botón en reseñas, 1 por cliente) |
-| Seeder | `seeder.js` | Crea pedidos con `buildOrder()` y los entrega con `completeOrder()`: prueba la lógica real, no la simula |
-| Pruebas | Etiqueta 🧪 | Pedidos y reseñas de teléfonos de prueba aparecen marcados; «Borrar» solo elimina esos |
+| Acceso | `signInWithEmailAndPassword(adminAuth)` | Instancia `obrador` independiente: entrar como cliente con Google en el mismo navegador no cierra el panel |
+| Entregar | Botón «Entregado» | Definitivo. Confirma el teléfono del cliente: es la verificación antifraude |
+| Liberar teléfono | Panel → 📱 | Borra el cerrojo y deja la cuenta que lo tenía sin teléfono (tendrá que vincular otro) |
+| Seeder | `seeder.js` | Clientes `seed_*` con teléfono y código; pedidos con `buildOrder()` entregados con `completeOrder()` |
 
 ---
 
 ## Matriz de acceso (resumen de `firestore.rules`)
 
-| Colección | Cliente (su teléfono) | Sesión de prueba (teléfono de prueba) | Administrador | Público |
+| Colección | Cliente (su UID) | Cuenta de prueba (anónima) | Administrador | Público |
 |---|---|---|---|---|
-| `orders` | Crear y leer los suyos | Crear y leer los de prueba | Todo | — |
-| `customers` | Crear su alta, leer, editar nombre y dirección | Igual, sobre teléfonos de prueba | Todo | — |
-| `reviews` | Crear (con compra), leer | Crear marcadas como prueba | Premiar / borrar | Leer |
+| `customers/{uid}` | Crear su alta, leer, editar nombre y dirección, re-vincular teléfono si fue liberado | Igual, con `test: true` y teléfonos de prueba | Todo | — |
+| `phoneClaims` | Crear el suyo (si está libre), leer el suyo | Puede reutilizar teléfonos de prueba | Todo | — |
+| `referralCodes` | Crear el suyo en el alta, consultar uno concreto | Igual | Todo | — |
+| `orders` | Crear con su uid y su teléfono; leer los suyos | Igual, con `test: true` | Todo | — |
+| `reviews` | Crear (con compra), una por producto | Igual, con `test: true` | Premiar / borrar | Leer |
 | `reviewAuthors` | Crear la suya | Crear la suya | Leer / borrar | — |
 | `admins` | — | — | Leer la suya | — |
 
@@ -166,8 +147,8 @@ flowchart TD
 
 | Parámetro | Efecto |
 |---|---|
-| `?next=pagina.html` | Destino tras autenticarse (solo páginas internas, validado por `safeNext`) |
-| `?ref=600123456` | Código de referido; sobrevive al paso por el muro y precarga el alta |
-| `?pruebas=1` / `?pruebas=0` | Activa / desactiva el modo pruebas en producción (se recuerda en la pestaña) |
-| `?emuladores=1` | Solo en `localhost`: usa los emuladores de Firebase |
+| `?next=pagina.html` | Destino tras iniciar sesión (solo páginas internas, validado por `safeNext`) |
+| `?ref=ANA-7K3P` | Código de invitación; sobrevive al paso por el muro y se precarga en el alta |
+| `?pruebas=1` / `?pruebas=0` | Activa / desactiva el modo pruebas en producción (botón de cuenta de prueba y reseñas de prueba visibles) |
+| `?emuladores=1` | Solo en `localhost`: usa los emuladores de Firebase (cuentas de Google ficticias) |
 | `?source=pwa` | Marca las aperturas desde la app instalada |

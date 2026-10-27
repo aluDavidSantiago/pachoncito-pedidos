@@ -1,6 +1,5 @@
 // Entorno de ejecución, emuladores y modo de pruebas.
-// IMPORTANTE: TEST_PHONES debe coincidir con isTestPhone() de firestore.rules
-// (+34 600 000 000 a +34 600 000 006 y +34 600 023 456).
+// IMPORTANTE: isTestPhone() debe coincidir con la función del mismo nombre en firestore.rules.
 import { el } from "./shared.js";
 
 const params = new URLSearchParams(location.search);
@@ -18,10 +17,12 @@ function sessionFlag(param, fallback) {
 
 export const IS_LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 
-// Emuladores de Firebase (Auth + Firestore): solo en local y con ?emuladores=1
+// Emuladores de Firebase (Auth + Firestore): solo en local y con ?emuladores=1.
+// El emulador de Auth muestra cuentas de Google ficticias: no hace falta ninguna cuenta real.
 export const USE_EMULATORS = IS_LOCAL && sessionFlag('emuladores', false);
 
-// Modo pruebas (aviso, código rellenado, reseñas de prueba visibles): siempre en local; en producción con ?pruebas=1
+// Modo pruebas: muestra «Entrar como cliente de prueba» (sesión anónima) y las reseñas de prueba.
+// Siempre activo en local; en producción con ?pruebas=1 (y ?pruebas=0 para salir).
 export const TEST_MODE = IS_LOCAL || sessionFlag('pruebas', false);
 
 export const EMULATORS = {
@@ -30,25 +31,21 @@ export const EMULATORS = {
     firestorePort: 8080
 };
 
-// Números ficticios: en producción hay que darlos de alta en Firebase Console →
-// Authentication → Sign-in method → Teléfono → «Números de teléfono para pruebas», todos con TEST_OTP.
-export const TEST_OTP = '123456';
+// Teléfonos ficticios para cuentas de prueba: +34 600 000 000 a +34 600 000 999 y +34 600 023 456.
+// Los clientes de prueba (sesión anónima) solo pueden vincular estos números.
+export const isTestPhone = phone => typeof phone === 'string' && /^\+34600(000\d{3}|023456)$/.test(phone);
+export const TEST_PHONES_LABEL = '+34 600 000 000–999 o +34 600 023 456';
 
+// Clientes que crea el generador de datos del panel (UID ficticio "seed_*")
 export const TEST_CUSTOMERS = [
-    { phone: '+34600000001', name: 'Ana Prueba' },
-    { phone: '+34600000002', name: 'Bruno Prueba' },
-    { phone: '+34600000003', name: 'Carla Prueba' },
-    { phone: '+34600000004', name: 'Diego Prueba' },
-    { phone: '+34600000005', name: 'Elena Prueba' },
-    { phone: '+34600000006', name: 'Fran Prueba' },
-    { phone: '+34600023456', name: 'Probador Pachoncito' }
+    { uid: 'seed_ana', name: 'Ana Prueba', phone: '+34600000001', referralCode: 'ANA-TEST' },
+    { uid: 'seed_bruno', name: 'Bruno Prueba', phone: '+34600000002', referralCode: 'BRU-TEST' },
+    { uid: 'seed_carla', name: 'Carla Prueba', phone: '+34600000003', referralCode: 'CAR-TEST' },
+    { uid: 'seed_diego', name: 'Diego Prueba', phone: '+34600000004', referralCode: 'DIE-TEST' },
+    { uid: 'seed_elena', name: 'Elena Prueba', phone: '+34600000005', referralCode: 'ELE-TEST' },
+    { uid: 'seed_fran', name: 'Fran Prueba', phone: '+34600000006', referralCode: 'FRA-TEST' },
+    { uid: 'seed_probador', name: 'Probador Pachoncito', phone: '+34600023456', referralCode: 'PRO-TEST' }
 ];
-
-// +34600000000 no lo usa el generador: queda libre para probar a mano como cliente nuevo
-export const TEST_PHONES = ['+34600000000', ...TEST_CUSTOMERS.map(customer => customer.phone)];
-export const TEST_PHONES_LABEL = '+34 600 000 000–006 o +34 600 023 456';
-
-export const isTestPhone = phone => TEST_PHONES.includes(phone);
 
 export function mountEnvBanner() {
     if (!TEST_MODE) return;
@@ -56,6 +53,6 @@ export function mountEnvBanner() {
     document.body.classList.add('has-env-banner');
     document.body.prepend(el('div', { className: 'env-banner', role: 'note' },
         el('strong', { text: `🧪 Modo pruebas · ${target}` }),
-        ` · Teléfonos ${TEST_PHONES_LABEL} · código ${TEST_OTP}`
+        ` · Entra como cliente de prueba y usa teléfonos ${TEST_PHONES_LABEL}`
     ));
 }

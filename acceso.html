@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#151210">
-    <meta name="description" content="Entra en Pachoncito con tu móvil para pedir pandebonos y acumular ñapas.">
+    <meta name="description" content="Entra en Pachoncito para reservar pandebonos y acumular ñapas.">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icons/favicon-dark-48.png" media="(prefers-color-scheme: dark)">
     <link rel="icon" href="icons/favicon-light-48.png" media="(prefers-color-scheme: light)">
@@ -22,97 +22,98 @@
             <div class="logo-container">
                 <img src="1.png" alt="Pachoncito" class="brand-logo" width="300" height="73">
             </div>
-            <div class="badge">Área Personal | Sistema de Ñapas</div>
+            <div class="badge">Pandebonos artesanales · Premià de Mar</div>
         </header>
 
         <main>
-            <p id="stepLoading" class="loading-state">Comprobando tu sesión… 🥖</p>
+            <p id="stepLoading" class="loading-state">Comprobando tu sesión…</p>
 
-            <!-- PASO 1: Teléfono -->
-            <section class="form-section" id="stepPhone" hidden>
-                <h2>Entra con tu móvil</h2>
+            <!-- Navegador interno de Instagram/Facebook: Google bloquea ahí su inicio de sesión -->
+            <section class="form-section" id="stepInApp" hidden>
+                <h2>Ábrelo en tu navegador</h2>
                 <p class="section-desc">
-                    Para pedir, ver tus ñapas y valorar verificamos tu móvil <strong>una sola vez</strong> con un código por SMS.
-                    Después la app te recordará.
+                    Estás dentro de Instagram o Facebook, y Google no permite iniciar sesión desde aquí.
+                    Abre esta página en Chrome o Safari para continuar.
                 </p>
-                <div class="field">
-                    <label for="loginPhone">Teléfono móvil</label>
-                    <input type="tel" id="loginPhone" inputmode="tel" autocomplete="tel" placeholder="600 000 000">
-                </div>
-                <button type="button" id="sendCodeBtn" class="btn btn-primary">Enviarme el código SMS 🚀</button>
+                <ol class="info-list">
+                    <li>Pulsa el menú <strong>⋯</strong> (arriba a la derecha).</li>
+                    <li>Elige <strong>«Abrir en el navegador»</strong> o <strong>«Abrir en navegador externo»</strong>.</li>
+                </ol>
+                <a id="openChromeLink" class="btn btn-primary" hidden>Abrir en Chrome</a>
+                <button type="button" id="copyLinkBtn" class="btn btn-secondary">Copiar el enlace</button>
+                <button type="button" id="tryAnywayBtn" class="btn btn-link">Intentarlo aquí de todos modos</button>
             </section>
 
-            <!-- PASO 2: Código SMS -->
-            <section class="form-section" id="stepVerify" hidden>
-                <h2>Verificación por SMS</h2>
-                <p class="section-desc">Introduce el código de 6 dígitos que has recibido.</p>
-                <div class="field">
-                    <label for="smsCode">Código de verificación</label>
-                    <input type="text" id="smsCode" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">
-                </div>
-                <button type="button" id="verifyBtn" class="btn btn-primary">Verificar y entrar 🥖</button>
-                <button type="button" id="changePhoneBtn" class="btn btn-secondary">← Cambiar teléfono</button>
+            <!-- PASO 1: Iniciar sesión -->
+            <section class="form-section" id="stepSignIn" hidden>
+                <h2>Entra en Pachoncito</h2>
+                <p class="section-desc">
+                    Con tu cuenta de Google reservas en segundos, sigues tus pedidos y acumulas ñapas.
+                    No necesitas contraseña nueva.
+                </p>
+                <button type="button" id="googleBtn" class="btn btn-google">
+                    <svg class="google-logo" viewBox="0 0 48 48" aria-hidden="true">
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                    </svg>
+                    Continuar con Google
+                </button>
+                <button type="button" id="testLoginBtn" class="btn btn-secondary" hidden>🧪 Entrar como cliente de prueba</button>
+                <p class="hint">
+                    Solo usamos tu nombre y tu email para gestionar tus pedidos. No publicamos nada en tu nombre.
+                </p>
             </section>
 
-            <!-- PASO 3: Alta (expediente en customers/{teléfono}) -->
+            <!-- PASO 2: Alta (expediente) / vinculación del teléfono -->
             <section class="form-section" id="stepProfile" hidden>
-                <h2>¡Bienvenido a Pachoncito! 🥖</h2>
-                <p class="section-desc">Solo falta tu nombre para crear tu cuenta y empezar a acumular ñapas.</p>
+                <h2 id="profileTitle">Completa tu cuenta</h2>
+                <p class="section-desc" id="profileDesc">Necesitamos tu nombre y un teléfono para coordinar las entregas.</p>
 
-                <div class="field">
-                    <label for="regNames">Nombre(s)</label>
-                    <input type="text" id="regNames" autocomplete="given-name" maxlength="40" placeholder="Tu nombre">
+                <div class="field" data-signup-only>
+                    <label for="regName">Nombre y apellidos</label>
+                    <input type="text" id="regName" autocomplete="name" maxlength="80" placeholder="Tu nombre completo">
                 </div>
                 <div class="field">
-                    <label for="regSurnames">Apellido(s)</label>
-                    <input type="text" id="regSurnames" autocomplete="family-name" maxlength="39" placeholder="Tus apellidos">
+                    <label for="regPhone">Teléfono / WhatsApp</label>
+                    <input type="tel" id="regPhone" inputmode="tel" autocomplete="tel" placeholder="600 000 000">
+                    <p class="hint">Solo se puede vincular a una cuenta y no se puede cambiar después. Lo confirmamos contigo en la primera entrega.</p>
                 </div>
-                <div class="field">
+                <div class="field" data-signup-only>
                     <label for="regAddress">Dirección de entrega <span class="optional">(opcional)</span></label>
                     <input type="text" id="regAddress" autocomplete="street-address" maxlength="200" placeholder="Calle, número, piso...">
                 </div>
-
-                <div class="panel-soft" id="referralPanel">
-                    <span class="label">¿Vienes recomendado por alguien?</span>
-                    <div class="radio-group">
-                        <label class="choice"><input type="radio" name="isReferenced" value="si"> Sí</label>
-                        <label class="choice"><input type="radio" name="isReferenced" value="no" checked> No</label>
-                    </div>
-                    <div id="refPhoneContainer" class="field field-reveal" hidden>
-                        <label for="friendPhone">Teléfono de tu recomendador</label>
-                        <input type="tel" id="friendPhone" inputmode="tel" autocomplete="off" placeholder="600 000 000">
-                    </div>
-                    <button type="button" id="infoBtn" class="btn btn-link">✨ ¿Cómo puedes ganar más pancitos tú también? Pincha aquí</button>
+                <div class="field" data-signup-only>
+                    <label for="regInvite">Código de invitación <span class="optional">(opcional)</span></label>
+                    <input type="text" id="regInvite" autocomplete="off" autocapitalize="characters" maxlength="8" placeholder="ABC-1234">
+                    <button type="button" id="infoBtn" class="btn btn-link">¿Cómo funcionan las invitaciones?</button>
                 </div>
 
                 <button type="button" id="saveProfileBtn" class="btn btn-primary">Crear mi cuenta</button>
-                <button type="button" id="logoutBtn" class="btn btn-secondary">Usar otro teléfono</button>
+                <button type="button" id="logoutBtn" class="btn btn-secondary">Usar otra cuenta</button>
             </section>
 
-            <!-- PASO 4: Bienvenida + invitación a instalar la app -->
+            <!-- PASO 3: Bienvenida + invitación a instalar la app -->
             <section class="form-section" id="stepWelcome" hidden>
-                <h2>¡Todo listo! 🎉</h2>
-                <p class="section-desc">Tu cuenta está creada. Ya puedes reservar tus pandebonos para este domingo.</p>
+                <h2>Cuenta creada</h2>
+                <p class="section-desc">Ya puedes reservar tus pandebonos para este domingo.</p>
                 <div id="installSlot"></div>
-                <button type="button" id="continueBtn" class="btn btn-primary">Hacer mi primer pedido 🥖</button>
+                <button type="button" id="continueBtn" class="btn btn-primary">Hacer mi primer pedido</button>
             </section>
 
             <p id="accessMessage" class="form-message" role="status" aria-live="polite" hidden></p>
         </main>
 
-        <!-- Cómo ganar ñapas -->
         <dialog id="infoModal" class="modal" aria-labelledby="infoTitle">
-            <h3 id="infoTitle">🥖 ¿Cómo ganar más Pancitos gratis?</h3>
-            <p class="section-desc">Disfrutar de los mejores pandebonos tiene premio doble:</p>
+            <h3 id="infoTitle">Invita y gana ñapas</h3>
             <ol class="info-list">
-                <li><strong>1️⃣ Tu número es tu código</strong><br>Tu teléfono registrado es tu código de referido personal.</li>
-                <li><strong>2️⃣ Pásaselo a tus compis</strong><br>Diles que, al darse de alta, pongan <strong>tu número de teléfono</strong> como recomendador.</li>
-                <li><strong>3️⃣ ¡Ñapa automática!</strong><br>Cuando les entreguemos su primer pedido, <strong>tú ganas una ñapa gratis</strong> para tu siguiente pedido dominical. ¡Sin límites! 🔥</li>
+                <li>Cada cliente tiene un <strong>código de invitación</strong> propio (lo verás en «Mi cuenta»).</li>
+                <li>Quien se da de alta con tu código queda vinculado a ti.</li>
+                <li>Cuando le entreguemos su primer pedido, <strong>tú ganas una ñapa</strong>: un pandebono extra en tu siguiente pedido.</li>
             </ol>
-            <button type="button" id="closeInfoBtn" class="btn btn-primary">¡Entendido! 🚀</button>
+            <button type="button" id="closeInfoBtn" class="btn btn-primary">Entendido</button>
         </dialog>
-
-        <div id="recaptcha-container"></div>
     </div>
 
     <script type="module" src="acceso.js"></script>

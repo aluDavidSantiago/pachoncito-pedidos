@@ -1,4 +1,4 @@
-// Área del cliente recurrente: saldo de ñapas, historial de pedidos, enlace de referido e instalación de la app.
+// Área del cliente recurrente: saldo de ñapas, historial de pedidos, código de invitación e instalación de la app.
 import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { mountEnvBanner } from "./env.js";
 import { db } from "./firebase.js";
@@ -21,24 +21,26 @@ const STATUS = {
     rejected: ['Rechazado', 'status-rejected']
 };
 
-$('helloTitle').textContent = `Hola, ${profile.name.split(' ')[0]} 👋`;
-$('accountPhone').textContent = session.isTestSession
-    ? `🧪 Sesión de prueba · ${session.phone}`
-    : `Móvil verificado · ${session.phone}`;
+$('helloTitle').textContent = `Hola, ${profile.name.split(' ')[0]}`;
+$('accountPhone').textContent = [
+    session.isTest ? '🧪 Cuenta de prueba' : profile.email,
+    `Teléfono ${profile.phone}${profile.phoneVerified ? ' (confirmado)' : ' (se confirma en tu primera entrega)'}`
+].filter(Boolean).join(' · ');
 $('statNapas').textContent = profile.napaCredits || 0;
 $('statOrders').textContent = profile.completedOrders || 0;
 $('statReferrals').textContent = profile.referralsCount || 0;
+$('referralCode').textContent = profile.referralCode || '—';
 
 mountInstallPrompt($('installSlot'));
 
-// ---------- Enlace de referido ----------
+// ---------- Enlace de invitación ----------
 
-const referralLink = new URL(`index.html?ref=${encodeURIComponent(session.phone.replace('+34', ''))}`, location.href).href;
+const referralLink = new URL(`index.html?ref=${encodeURIComponent(profile.referralCode || '')}`, location.href).href;
 
 $('shareBtn').addEventListener('click', async () => {
     const shareData = {
         title: 'Pachoncito',
-        text: '🥖 Prueba los pandebonos de Pachoncito. Si pides con mi enlace, me llevo una ñapa:',
+        text: `Prueba los pandebonos de Pachoncito. Date de alta con mi código ${profile.referralCode}:`,
         url: referralLink
     };
     try {
@@ -46,7 +48,7 @@ $('shareBtn').addEventListener('click', async () => {
             await navigator.share(shareData);
         } else {
             await navigator.clipboard.writeText(`${shareData.text} ${referralLink}`);
-            showMessage($('shareMessage'), '¡Enlace copiado! Pégalo en WhatsApp o donde quieras.', 'success');
+            showMessage($('shareMessage'), 'Enlace copiado. Pégalo en WhatsApp o donde quieras.', 'success');
         }
     } catch (error) {
         if (error?.name === 'AbortError') return; // el cliente cerró el menú de compartir
@@ -72,11 +74,11 @@ function orderItem(order) {
         ),
         el('p', { className: 'order-line', text: itemsText(order.items) }),
         el('p', { className: 'order-meta' },
-            `${order.deliveryMethod === 'domicilio' ? '🏠 A domicilio' : '📍 Recogida'} · ⏰ ${order.deliverySlot || '—'} · `,
+            `${order.deliveryMethod === 'domicilio' ? 'A domicilio' : 'Recogida'} · ${order.deliverySlot || '—'} · `,
             el('strong', { text: formatEUR(order.totalCents) })
         ),
         order.napaCount > 0
-            ? el('p', { className: 'meta-success', text: `🎁 ${order.napaCount} ${order.napaCount === 1 ? 'ñapa' : 'ñapas'} de regalo` })
+            ? el('p', { className: 'meta-success', text: `${order.napaCount} ${order.napaCount === 1 ? 'ñapa' : 'ñapas'} de regalo` })
             : null
     );
 }
@@ -85,12 +87,12 @@ async function loadOrders() {
     const list = $('ordersList');
     try {
         // Sin orderBy en la consulta para no necesitar índice compuesto: se ordena aquí
-        const snap = await getDocs(query(collection(db, 'orders'), where('phone', '==', session.phone)));
+        const snap = await getDocs(query(collection(db, 'orders'), where('uid', '==', session.uid)));
         const orders = snap.docs.map(normalizeOrder)
             .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
         list.replaceChildren(...(orders.length
             ? orders.map(orderItem)
-            : [el('p', { className: 'empty-state', text: 'Todavía no has hecho ningún pedido. ¡El domingo te esperan unos pandebonos! 🥖' })]));
+            : [el('p', { className: 'empty-state', text: 'Todavía no has hecho ningún pedido.' })]));
     } catch (error) {
         console.error('Error al cargar el historial:', error);
         list.replaceChildren(el('p', { className: 'empty-state', text: 'No se pudo cargar tu historial.' }));

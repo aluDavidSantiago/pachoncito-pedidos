@@ -1,14 +1,15 @@
+// Panel del obrador. Usa SU PROPIA instancia de Firebase (admin-firebase.js): la sesión de email y contraseña
+// del obrador nunca se mezcla con la sesión de Google de un cliente en el mismo navegador.
 import {
     collection, deleteDoc, doc, getDoc, limit, onSnapshot, orderBy, query,
     runTransaction, serverTimestamp, updateDoc, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { auth } from "./auth.js";
-import { isTestPhone, mountEnvBanner, TEST_CUSTOMERS, TEST_OTP, TEST_PHONES_LABEL, USE_EMULATORS } from "./env.js";
-import { db } from "./firebase.js";
+import { adminAuth, adminDb as db } from "./admin-firebase.js";
+import { mountEnvBanner, TEST_CUSTOMERS, TEST_PHONES_LABEL, USE_EMULATORS } from "./env.js";
 import { completeOrder, normalizeOrder } from "./orders.js";
 import { clearTestData, seedTestData } from "./seeder.js";
-import { el, formatDate, formatEUR, PRODUCT_NAMES, RATING_ASPECTS, showMessage, starsText, withBusy } from "./shared.js";
+import { el, formatDate, formatEUR, normalizePhone, PRODUCT_NAMES, RATING_ASPECTS, showMessage, starsText, withBusy } from "./shared.js";
 
 mountEnvBanner();
 const $ = id => document.getElementById(id);
@@ -23,12 +24,12 @@ const STATUS = {
 };
 
 let orders = [];
-let customers = new Map();
+let customers = new Map(); // uid → expediente
 let reviews = [];
 let production = { clasicos: 0, bocadillos: 0, napas: 0, ingresosCents: 0 };
 let unsubscribers = [];
 
-// ---------- Autenticación ----------
+// ---------- Autenticación (email y contraseña, sin cambios para el obrador) ----------
 
 function showView(view) {
     $('authStatus').hidden = view !== 'loading';
@@ -57,15 +58,15 @@ $('loginForm').addEventListener('submit', async event => {
         return;
     }
     try {
-        await withBusy(event.submitter, 'Entrando…', () => signInWithEmailAndPassword(auth, email, password));
+        await withBusy(event.submitter, 'Entrando…', () => signInWithEmailAndPassword(adminAuth, email, password));
     } catch (error) {
         showMessage($('loginMessage'), loginErrorMessage(error), 'error');
     }
 });
 
-$('logoutBtn').addEventListener('click', () => signOut(auth));
+$('logoutBtn').addEventListener('click', () => signOut(adminAuth));
 
-onAuthStateChanged(auth, async user => {
+onAuthStateChanged(adminAuth, async user => {
     stopListeners();
     if (!user) {
         showView('login');
@@ -81,8 +82,9 @@ onAuthStateChanged(auth, async user => {
     }
 
     if (!isAdmin) {
+        await signOut(adminAuth); // la instancia del panel solo guarda sesiones de administrador
         showView('login');
-        if (user.email) showMessage($('loginMessage'), 'Esta cuenta no tiene permisos de administración.', 'error');
+        showMessage($('loginMessage'), 'Esta cuenta no tiene permisos de administración.', 'error');
         return;
     }
 
@@ -124,10 +126,12 @@ function stopListeners() {
     reviews = [];
 }
 
-// Ñapas acumuladas (referidos / feedback) que se entregan con este pedido
+const customerOf = order => (order.uid ? customers.get(order.uid) : null);
+
+// Ñapas acumuladas (invitaciones / feedback) que se entregan con este pedido
 function accumulatedNapas(order) {
     if (order.status === 'completed') return order.creditsRedeemed || 0;
-    return customers.get(order.phoneKey)?.napaCredits || 0;
+    return customerOf(order)?.napaCredits || 0;
 }
 
 function renderOrdersAndStats() {
@@ -139,7 +143,7 @@ function renderOrdersAndStats() {
 
 function renderStats() {
     let clasicos = 0, bocadillos = 0, napas = 0, ingresosCents = 0;
-    const phonesWithCredits = new Set();
+    const customersWithCredits = new Set();
 
     for (const order of orders) {
         if (order.status === 'rejected') continue;
@@ -150,10 +154,10 @@ function renderStats() {
 
         if (order.status === 'completed') {
             napas += order.creditsRedeemed || 0;
-        } else if (order.phoneKey && !phonesWithCredits.has(order.phoneKey)) {
+        } else if (order.uid && !customersWithCredits.has(order.uid)) {
             // Un cliente con varios pedidos abiertos solo canjea sus ñapas una vez
-            phonesWithCredits.add(order.phoneKey);
-            napas += customers.get(order.phoneKey)?.napaCredits || 0;
+            customersWithCredits.add(order.uid);
+            napas += customerOf(order)?.napaCredits || 0;
         }
     }
 
@@ -212,6 +216,7 @@ function orderCard(order) {
     const status = STATUS[order.status] || STATUS.pending;
     const isClosed = order.status === 'completed';
     const credits = accumulatedNapas(order);
+    const customer = customerOf(order);
     const phoneNode = order.phoneKey
         ? el('a', { className: 'order-phone', href: `tel:${order.phoneKey}`, text: `📞 ${order.phone}` })
         : el('span', { className: 'order-phone', text: `📞 ${order.phone || 'Sin teléfono'}` });
@@ -224,6 +229,12 @@ function orderCard(order) {
         metaLine('⏰ ', el('strong', { text: 'Hora:' }), ` ${order.deliverySlot || '—'} · 💰 `,
             el('strong', { text: 'Total:' }), ` ${formatEUR(order.totalCents)}`),
         order.createdAt ? metaLine('📅 ', formatDate(order.createdAt)) : null,
+        !order.uid
+            ? el('p', { className: 'meta-accent', text: 'Pedido anterior a las cuentas de cliente' })
+            : el('p', { className: customer?.phoneVerified ? 'meta-success' : 'meta-accent',
+                text: customer?.phoneVerified
+                    ? '📱 Teléfono confirmado'
+                    : '📱 Teléfono sin confirmar: compruébalo al entregar' }),
         order.napaCount > 0
             ? el('p', { className: 'meta-success', text: `🎁 Incluye ${order.napaCount} ${order.napaCount === 1 ? 'ñapa' : 'ñapas'} por volumen de compra` })
             : null,
@@ -231,12 +242,15 @@ function orderCard(order) {
             ? el('p', {
                 className: 'meta-success',
                 text: isClosed
-                    ? `🎁 Se entregaron ${credits} ${credits === 1 ? 'ñapa acumulada' : 'ñapas acumuladas'} (referidos / reseñas)`
-                    : `🎁 +${credits} ${credits === 1 ? 'ñapa acumulada' : 'ñapas acumuladas'} (referidos / reseñas): entrégalas en este pedido`
+                    ? `🎁 Se entregaron ${credits} ${credits === 1 ? 'ñapa acumulada' : 'ñapas acumuladas'} (invitaciones / reseñas)`
+                    : `🎁 +${credits} ${credits === 1 ? 'ñapa acumulada' : 'ñapas acumuladas'} (invitaciones / reseñas): entrégalas en este pedido`
             })
             : null,
-        order.referralCode
-            ? el('p', { className: 'meta-accent', text: `🤝 Recomendado por ${order.referralCode}${order.referralRewarded ? ' — ñapa concedida al recomendador' : ''}` })
+        customer?.referredByCode && !customer.completedOrders
+            ? el('p', { className: 'meta-accent', text: `🤝 Invitado con el código ${customer.referredByCode}: su recomendador gana una ñapa al entregar este primer pedido` })
+            : null,
+        order.referralRewarded
+            ? el('p', { className: 'meta-success', text: '🤝 Ñapa de invitación concedida al recomendador' })
             : null,
         order.status === 'rejected'
             ? el('p', { className: 'meta-danger', text: '❌ Pedido rechazado por el obrador' })
@@ -260,7 +274,7 @@ function orderCard(order) {
     return el('article', { className: 'order-card' },
         el('div', { className: 'order-info' },
             el('h3', {}, order.customerName || 'Sin nombre', phoneNode,
-                isTestPhone(order.phoneKey) ? el('span', { className: 'test-tag', text: '🧪 Prueba' }) : null),
+                order.test ? el('span', { className: 'test-tag', text: '🧪 Prueba' }) : null),
             meta,
             actions
         ),
@@ -280,12 +294,16 @@ function renderOrders() {
 async function changeStatus(order, newStatus, button) {
     try {
         if (newStatus === 'completed') {
-            if (!confirm('¿Marcar como entregado? Se registrará la compra del cliente, se canjearán sus ñapas acumuladas y, si vino recomendado, su recomendador ganará una ñapa. No se puede deshacer.')) return;
+            const ok = confirm(`¿Marcar como entregado?\n\nAl hacerlo confirmas que el teléfono ${order.phone || ''} es de este cliente. `
+                + 'Se registrará su compra, se canjearán sus ñapas acumuladas y, si es su primer pedido y vino invitado, '
+                + 'su recomendador ganará una ñapa. No se puede deshacer.');
+            if (!ok) return;
             const result = await withBusy(button, '…', () => completeOrder(db, order.id));
             if (result) {
                 const notes = ['Pedido entregado y registrado.'];
                 if (result.creditsRedeemed) notes.push(`Ñapas acumuladas canjeadas: ${result.creditsRedeemed}.`);
                 if (result.referrerRewarded) notes.push('El recomendador ha ganado una ñapa para su próximo pedido.');
+                if (result.legacyMerged) notes.push('Se ha fusionado su historial anterior.');
                 if (result.warning) notes.push(result.warning);
                 showMessage(adminMessage, notes.join(' '), result.warning ? 'info' : 'success');
             }
@@ -348,7 +366,7 @@ function renderReviews() {
     container.replaceChildren(...reviews.map(reviewCard));
 }
 
-// Recompensa por feedback: 1 ñapa por cliente (la primera reseña premiada)
+// Recompensa por feedback: 1 ñapa por cliente y solo con el teléfono confirmado (evita multicuenta)
 async function rewardReview(reviewId, button) {
     try {
         const outcome = await withBusy(button, '…', () => runTransaction(db, async tx => {
@@ -357,14 +375,15 @@ async function rewardReview(reviewId, button) {
             const authorSnap = await tx.get(doc(db, 'reviewAuthors', reviewId));
             if (!reviewSnap.exists() || reviewSnap.data().rewarded) return 'already';
 
-            const customerRef = authorSnap.exists() ? doc(db, 'customers', authorSnap.data().phone) : null;
+            const authorUid = authorSnap.exists() ? authorSnap.data().uid : null;
+            const customerRef = authorUid ? doc(db, 'customers', authorUid) : null;
             const customerSnap = customerRef ? await tx.get(customerRef) : null;
-            tx.update(reviewRef, { rewarded: true });
-
             if (!customerSnap?.exists()) return 'no-customer';
             const customer = customerSnap.data();
-            if (customer.feedbackRewarded) return 'customer-already';
+            if (!customer.phoneVerified) return 'not-verified';
 
+            tx.update(reviewRef, { rewarded: true });
+            if (customer.feedbackRewarded) return 'customer-already';
             tx.update(customerRef, {
                 napaCredits: (customer.napaCredits || 0) + 1,
                 feedbackRewarded: true,
@@ -376,6 +395,7 @@ async function rewardReview(reviewId, button) {
         const messages = {
             rewarded: ['Ñapa añadida: se entregará en el próximo pedido del cliente.', 'success'],
             'customer-already': ['Este cliente ya recibió su ñapa por feedback; la reseña queda marcada.', 'info'],
+            'not-verified': ['El teléfono de este cliente aún no está confirmado (se confirma al entregar un pedido).', 'info'],
             'no-customer': ['No se encontró al cliente de esta reseña.', 'error'],
             already: ['Esta reseña ya estaba recompensada.', 'info']
         };
@@ -399,18 +419,52 @@ async function deleteReview(reviewId) {
     }
 }
 
+// ---------- Teléfonos vinculados (antifraude) ----------
+
+$('releasePhoneBtn').addEventListener('click', async event => {
+    const releaseMessage = $('releaseMessage');
+    const phone = normalizePhone($('releasePhone').value);
+    if (!phone) {
+        showMessage(releaseMessage, 'Introduce un teléfono válido.', 'error');
+        return;
+    }
+    if (!confirm(`¿Liberar el teléfono ${phone}? La cuenta que lo tiene vinculado tendrá que vincular otro antes de volver a pedir.`)) return;
+
+    try {
+        const result = await withBusy(event.currentTarget, 'Liberando…', () => runTransaction(db, async tx => {
+            const claimRef = doc(db, 'phoneClaims', phone);
+            const claimSnap = await tx.get(claimRef);
+            if (!claimSnap.exists()) return null;
+            const customerRef = doc(db, 'customers', claimSnap.data().uid);
+            const customerSnap = await tx.get(customerRef);
+            if (customerSnap.exists() && customerSnap.data().phone === phone) {
+                tx.update(customerRef, { phone: null, phoneVerified: false, updatedAt: serverTimestamp() });
+            }
+            tx.delete(claimRef);
+            return customerSnap.exists() ? customerSnap.data().name : 'cuenta eliminada';
+        }));
+        showMessage(releaseMessage, result
+            ? `Teléfono liberado (estaba vinculado a «${result}»).`
+            : 'Ese teléfono no está vinculado a ninguna cuenta.', result ? 'success' : 'info');
+        if (result) $('releasePhone').value = '';
+    } catch (error) {
+        console.error('Error al liberar el teléfono:', error);
+        showMessage(releaseMessage, 'No se pudo liberar el teléfono.', 'error');
+    }
+});
+
 // ---------- Datos de prueba ----------
 
 const seedMessage = $('seedMessage');
 
 $('testAccounts').replaceChildren(...TEST_CUSTOMERS.map(customer =>
-    el('li', {}, el('strong', { text: customer.name }), ` · ${customer.phone}`)
+    el('li', {}, el('strong', { text: customer.name }), ` · ${customer.phone} · ${customer.referralCode}`)
 ));
-$('testOtp').textContent = TEST_OTP;
+$('testPhones').textContent = TEST_PHONES_LABEL;
 $('testTarget').textContent = USE_EMULATORS ? 'los emuladores locales' : 'la base de datos REAL (producción)';
 
 function confirmTarget(action) {
-    return USE_EMULATORS || confirm(`Vas a ${action} en la base de datos REAL de producción. Solo afecta a los teléfonos de prueba (${TEST_PHONES_LABEL}). ¿Continuar?`);
+    return USE_EMULATORS || confirm(`Vas a ${action} en la base de datos REAL de producción. Solo afecta a datos marcados como prueba. ¿Continuar?`);
 }
 
 function seedErrorMessage(error) {
@@ -424,7 +478,7 @@ $('seedBtn').addEventListener('click', async event => {
     try {
         const result = await withBusy(event.currentTarget, 'Generando…',
             () => seedTestData(db, step => showMessage(seedMessage, `🧪 ${step}…`)));
-        showMessage(seedMessage, `🧪 Datos de prueba listos: ${result.orders} pedidos y ${result.reviews} reseñas.`, 'success');
+        showMessage(seedMessage, `🧪 Datos de prueba listos: ${result.customers} clientes, ${result.orders} pedidos y ${result.reviews} reseñas.`, 'success');
     } catch (error) {
         console.error('Error generando datos de prueba:', error);
         showMessage(seedMessage, seedErrorMessage(error), 'error');
@@ -435,7 +489,7 @@ $('clearSeedBtn').addEventListener('click', async event => {
     if (!confirmTarget('borrar los datos de prueba')) return;
     try {
         const result = await withBusy(event.currentTarget, 'Borrando…', () => clearTestData(db));
-        showMessage(seedMessage, `🧹 Borrados ${result.orders} pedidos y ${result.reviews} reseñas de prueba, y sus clientes.`, 'success');
+        showMessage(seedMessage, `🧹 Borrados ${result.customers} clientes, ${result.orders} pedidos y ${result.reviews} reseñas de prueba.`, 'success');
     } catch (error) {
         console.error('Error borrando datos de prueba:', error);
         showMessage(seedMessage, seedErrorMessage(error), 'error');

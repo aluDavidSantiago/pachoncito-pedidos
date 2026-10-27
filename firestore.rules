@@ -3,12 +3,19 @@ rules_version = '2';
 // Reglas de seguridad de Pachoncito Pedidos.
 // Despliegue: firebase deploy --only firestore:rules
 //
+// Identidad: cada cliente es su UID de Firebase (Google, o anónimo en el modo pruebas).
+// El panel del obrador entra con email y contraseña y se reconoce por el documento admins/{uid}.
+//
 // Colecciones:
-//   admins/{uid}            Alta manual desde la consola de Firebase. Marca qué cuentas son del obrador.
-//   orders/{id}             El cliente verificado crea pedidos a su teléfono y lee los suyos; el obrador lo gestiona todo.
-//   customers/{telefono}    Expediente del cliente. Él crea su perfil (alta) y lo lee; ñapas y compras solo las escribe el obrador.
-//   reviews/{uid_producto}  Público y anónimo. Solo clientes verificados por SMS con compra previa.
-//   reviewAuthors/{id}      Privado. Vincula cada reseña con su teléfono (solo lo ve el obrador).
+//   admins/{uid}             Alta manual desde la consola. Marca qué cuentas son del obrador.
+//   customers/{uid}          Expediente del cliente. Él crea su alta y edita nombre/dirección;
+//                            ñapas, compras y verificación del teléfono solo los escribe el obrador.
+//   phoneClaims/{teléfono}   Cerrojo antifraude: un teléfono = una cuenta (y una cuenta = un teléfono).
+//   referralCodes/{código}   Código de invitación de cada cliente → su UID.
+//   orders/{id}              El cliente crea pedidos a su nombre y con su teléfono vinculado; lee los suyos.
+//   reviews/{uid_producto}   Públicas y anónimas. Una por cliente y producto, solo con compra entregada.
+//   reviewAuthors/{id}       Privado. Vincula cada reseña con su autor (solo lo ve el obrador).
+//   customers/{teléfono}     Expedientes antiguos (antes de las cuentas de Google): solo el obrador.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -23,8 +30,26 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Sesión anónima del modo pruebas (?pruebas=1): todo lo que cree queda marcado como prueba
+    function isAnonymous() {
+      return signedIn() && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
     function isPhone(value) {
       return value is string && value.matches('^[+][0-9]{8,15}$');
+    }
+
+    // Teléfonos ficticios de prueba. Deben coincidir con isTestPhone() de env.js.
+    function isTestPhone(phone) {
+      return isPhone(phone) && phone.matches('^[+]34600(000[0-9]{3}|023456)$');
+    }
+
+    function isReferralCode(value) {
+      return value is string && value.matches('^[A-Z]{3}-[A-Z2-9]{4}$');
     }
 
     function isQty(value) {
@@ -35,34 +60,133 @@ service cloud.firestore {
       return value is int && value >= 1 && value <= 5;
     }
 
-    // Teléfono verificado por SMS de la sesión ('' si no hay sesión o es una cuenta de email, como la del obrador)
-    function verifiedPhone() {
-      return signedIn() ? request.auth.token.get('phone_number', '') : '';
+    function customerPath(uid) {
+      return /databases/$(database)/documents/customers/$(uid);
     }
 
-    // Teléfonos ficticios de prueba (+34 600 000 000 a 006 y +34 600 023 456). Deben coincidir con TEST_PHONES de env.js.
-    function isTestPhone(phone) {
-      return isPhone(phone) && (phone.matches('^[+]3460000000[0-6]$') || phone == '+34600023456');
+    function claimPath(phone) {
+      return /databases/$(database)/documents/phoneClaims/$(phone);
     }
 
-    // Puede actuar en nombre de un teléfono: su dueño verificado por SMS, o cualquiera si es un teléfono de prueba
-    // (sesiones de prueba sin SMS; sus datos son ficticios y no se muestran al público)
-    function canActAs(phone) {
-      return isPhone(phone) && (verifiedPhone() == phone || isTestPhone(phone));
+    function codePath(code) {
+      return /databases/$(database)/documents/referralCodes/$(code);
+    }
+
+    // Los clientes de prueba (anónimos) solo pueden vincular teléfonos de prueba
+    function allowedPhone(phone) {
+      return isPhone(phone) && (!isAnonymous() || isTestPhone(phone));
+    }
+
+    function validName(name) {
+      return name is string && name.size() >= 2 && name.size() <= 80;
+    }
+
+    function validAddress(address) {
+      return address is string && address.size() <= 200;
+    }
+
+    // ---------- Administradores ----------
+
+    match /admins/{uid} {
+      allow get: if isOwner(uid);
+      allow list, write: if false;
+    }
+
+    // ---------- Clientes ----------
+
+    // Alta: perfil + phoneClaims + referralCodes en el MISMO lote (getAfter comprueba los tres).
+    function validNewCustomer(d, uid) {
+      return d.keys().hasAll(['name', 'email', 'phone', 'address', 'referralCode', 'test', 'createdAt', 'updatedAt'])
+        && d.keys().hasOnly(['name', 'email', 'phone', 'address', 'referralCode', 'referredByCode', 'test', 'createdAt', 'updatedAt'])
+        && validName(d.name)
+        && d.email == request.auth.token.get('email', '')
+        && allowedPhone(d.phone)
+        && validAddress(d.address)
+        && isReferralCode(d.referralCode)
+        && d.test == isAnonymous()
+        && d.createdAt == request.time
+        && d.updatedAt == request.time
+        && getAfter(claimPath(d.phone)).data.uid == uid
+        && getAfter(codePath(d.referralCode)).data.uid == uid
+        && (!('referredByCode' in d)
+              || (isReferralCode(d.referredByCode)
+                  && exists(codePath(d.referredByCode))
+                  && get(codePath(d.referredByCode)).data.uid != uid));
+    }
+
+    // Edición de datos de contacto (nunca ñapas, compras ni teléfono)
+    function isProfileEdit() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'address', 'updatedAt'])
+        && validName(request.resource.data.name)
+        && validAddress(request.resource.data.address)
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    // Nueva vinculación tras que el obrador liberase su teléfono (phone == null)
+    function isPhoneRelink(uid) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['phone', 'updatedAt'])
+        && resource.data.get('phone', null) == null
+        && allowedPhone(request.resource.data.phone)
+        && getAfter(claimPath(request.resource.data.phone)).data.uid == uid
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    match /customers/{uid} {
+      allow get: if isOwner(uid);
+      allow create: if isOwner(uid) && validNewCustomer(request.resource.data, uid);
+      allow update: if isOwner(uid) && (isProfileEdit() || isPhoneRelink(uid));
+      allow read, write: if isAdmin();
+    }
+
+    // ---------- Antifraude: un teléfono, una cuenta ----------
+
+    // Se crea en el mismo lote que el alta (o la nueva vinculación) de la cuenta que lo reclama.
+    // Como es "create" y no "update", si el teléfono ya está vinculado a otra cuenta el lote entero se rechaza.
+    function validClaim(phone) {
+      return allowedPhone(phone)
+        && request.resource.data.keys().hasAll(['uid', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && getAfter(customerPath(request.auth.uid)).data.phone == phone
+        && (!exists(customerPath(request.auth.uid))
+              || get(customerPath(request.auth.uid)).data.get('phone', null) == null);
+    }
+
+    match /phoneClaims/{phone} {
+      allow create: if signedIn() && validClaim(phone);
+      // Las cuentas de prueba pueden reutilizar teléfonos de prueba ya usados por otras cuentas de prueba
+      allow update: if isAnonymous() && isTestPhone(phone) && validClaim(phone);
+      allow get: if signedIn() && resource.data.uid == request.auth.uid;
+      allow read, write: if isAdmin(); // «Liberar teléfono» en el panel
+    }
+
+    // ---------- Códigos de invitación ----------
+
+    match /referralCodes/{code} {
+      // Para validar el código que escribe un cliente nuevo (solo revela un UID opaco)
+      allow get: if signedIn();
+      allow create: if signedIn()
+        && isReferralCode(code)
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid
+        && !exists(customerPath(request.auth.uid))
+        && getAfter(customerPath(request.auth.uid)).data.referralCode == code;
+      allow read, write: if isAdmin();
     }
 
     // ---------- Pedidos ----------
 
     // Precios en céntimos: deben coincidir con shared.js (clásico 150, bocadillo 170, envío 100).
     function validNewOrder(d) {
-      return d.keys().hasAll(['customerName', 'phone', 'items', 'subtotalCents', 'deliveryCents',
+      return d.keys().hasAll(['uid', 'customerName', 'phone', 'items', 'subtotalCents', 'deliveryCents',
                               'totalCents', 'napaCount', 'deliveryMethod', 'address', 'deliverySlot',
-                              'status', 'createdAt'])
-        && d.keys().hasOnly(['customerName', 'phone', 'items', 'subtotalCents', 'deliveryCents',
+                              'status', 'test', 'createdAt'])
+        && d.keys().hasOnly(['uid', 'customerName', 'phone', 'items', 'subtotalCents', 'deliveryCents',
                              'totalCents', 'napaCount', 'deliveryMethod', 'address', 'deliverySlot',
-                             'status', 'createdAt', 'referralCode'])
-        && d.customerName is string
-        && d.customerName.size() >= 2 && d.customerName.size() <= 80
+                             'status', 'test', 'createdAt'])
+        && d.uid is string
+        && validName(d.customerName)
         && isPhone(d.phone)
         && d.items is map
         && d.items.keys().hasAll(['clasico', 'bocadillo'])
@@ -81,62 +205,28 @@ service cloud.firestore {
               : d.address == 'Recogida en local')
         && d.deliverySlot is string
         && d.deliverySlot.matches('^(0[6-9]|1[0-7]):(00|30)$')
-        && (!('referralCode' in d) || (isPhone(d.referralCode) && d.referralCode != d.phone))
+        && d.test is bool
         && d.status == 'pending'
         && d.createdAt == request.time;
     }
 
-    match /admins/{uid} {
-      allow get: if signedIn() && request.auth.uid == uid;
-      allow list, write: if false;
-    }
-
-    // Auth wall en el servidor: solo se pide a nombre del propio teléfono verificado
     match /orders/{orderId} {
-      allow create: if validNewOrder(request.resource.data) && canActAs(request.resource.data.phone);
-      allow read: if isAdmin() || canActAs(resource.data.phone);
+      // Cliente: a su nombre y con SU teléfono vinculado (un teléfono liberado deja de valer)
+      allow create: if signedIn()
+        && validNewOrder(request.resource.data)
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.test == isAnonymous()
+        && request.resource.data.phone == get(customerPath(request.auth.uid)).data.phone;
+      // Generador de datos de prueba del panel
+      allow create: if isAdmin()
+        && validNewOrder(request.resource.data)
+        && request.resource.data.test == true
+        && request.resource.data.uid.matches('^seed_.+');
+      allow read: if isAdmin() || (signedIn() && resource.data.get('uid', '') == request.auth.uid);
       allow update, delete: if isAdmin();
     }
 
-    // ---------- Clientes ----------
-
-    // Perfil que crea el propio cliente en el alta (onboarding). El resto de campos
-    // (napaCredits, completedOrders, purchased, referidos…) solo los escribe el obrador al entregar pedidos.
-    function validProfile(d, phone) {
-      return d.keys().hasAll(['name', 'phone', 'address', 'createdAt', 'updatedAt'])
-        && d.keys().hasOnly(['name', 'phone', 'address', 'referralCode', 'createdAt', 'updatedAt'])
-        && d.name is string && d.name.size() >= 2 && d.name.size() <= 80
-        && d.phone == phone
-        && d.address is string && d.address.size() <= 200
-        && (!('referralCode' in d) || (isPhone(d.referralCode) && d.referralCode != phone))
-        && d.createdAt == request.time
-        && d.updatedAt == request.time;
-    }
-
-    match /customers/{phone} {
-      allow read, write: if isAdmin();
-      allow get: if canActAs(phone);
-      allow create: if canActAs(phone) && validProfile(request.resource.data, phone);
-      // Expediente creado antes por el obrador: el cliente solo completa nombre y dirección
-      allow update: if canActAs(phone)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'address', 'updatedAt'])
-        && request.resource.data.name is string
-        && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 80
-        && request.resource.data.address is string && request.resource.data.address.size() <= 200
-        && request.resource.data.updatedAt == request.time;
-    }
-
     // ---------- Reseñas ----------
-
-    function hasPurchased(phone, product) {
-      let path = /databases/$(database)/documents/customers/$(phone);
-      return exists(path) && get(path).data.get('purchased', {}).get(product, 0) > 0;
-    }
-
-    // Teléfono del autor de una reseña de prueba, leído del documento reviewAuthors que se crea en el mismo lote
-    function testAuthorPhone(reviewId) {
-      return getAfter(/databases/$(database)/documents/reviewAuthors/$(reviewId)).data.phone;
-    }
 
     function validReview(d) {
       return d.keys().hasAll(['product', 'ratings', 'comment', 'test', 'rewarded', 'createdAt'])
@@ -155,32 +245,22 @@ service cloud.firestore {
         && d.createdAt == request.time;
     }
 
-    // Una reseña por cliente y producto: el id es "<uid>_<producto>" y solo se permite crearla, nunca sobrescribirla.
-    // El documento público no guarda nombre ni teléfono. "test" es obligatorio y debe decir la verdad:
-    // las cuentas de prueba no pueden publicar reseñas que parezcan de clientes reales.
+    // Una reseña por cliente y producto: id "<uid>_<producto>", solo se crea y nunca se sobrescribe.
+    // El Clásico y el Bocadillo son documentos distintos: se valoran por separado.
     match /reviews/{reviewId} {
       allow read: if true;
       allow create: if signedIn()
-        && isPhone(verifiedPhone())
         && reviewId == request.auth.uid + '_' + request.resource.data.product
         && validReview(request.resource.data)
-        && request.resource.data.test == isTestPhone(verifiedPhone())
-        && hasPurchased(verifiedPhone(), request.resource.data.product)
+        && request.resource.data.test == isAnonymous()
+        && get(customerPath(request.auth.uid)).data.get('purchased', {}).get(request.resource.data.product, 0) > 0
         && existsAfter(/databases/$(database)/documents/reviewAuthors/$(reviewId));
-      // Generador de datos de prueba del panel: solo ids "seed_*" y siempre marcadas como prueba
+      // Generador de datos de prueba del panel: clientes "seed_*", siempre marcadas como prueba
       allow create: if isAdmin()
         && reviewId.matches('^seed_.+')
         && validReview(request.resource.data)
         && request.resource.data.test == true
         && existsAfter(/databases/$(database)/documents/reviewAuthors/$(reviewId));
-      // Sesión de prueba sin SMS (resenas.js): solo teléfonos de prueba con compra entregada,
-      // id "test_<teléfono>_<producto>" (una por producto) y siempre marcada como prueba.
-      // Como mucho existe una por teléfono de prueba y producto, y el público no las ve.
-      allow create: if validReview(request.resource.data)
-        && request.resource.data.test == true
-        && isTestPhone(testAuthorPhone(reviewId))
-        && reviewId == 'test_' + testAuthorPhone(reviewId) + '_' + request.resource.data.product
-        && hasPurchased(testAuthorPhone(reviewId), request.resource.data.product);
       allow update: if isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rewarded']);
       allow delete: if isAdmin();
@@ -188,24 +268,15 @@ service cloud.firestore {
 
     match /reviewAuthors/{reviewId} {
       allow create: if signedIn()
-        && isPhone(verifiedPhone())
-        && request.resource.data.keys().hasAll(['uid', 'phone', 'product'])
-        && request.resource.data.keys().hasOnly(['uid', 'phone', 'product'])
+        && request.resource.data.keys().hasAll(['uid', 'product'])
+        && request.resource.data.keys().hasOnly(['uid', 'product'])
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.phone == verifiedPhone()
         && reviewId == request.auth.uid + '_' + request.resource.data.product
         && existsAfter(/databases/$(database)/documents/reviews/$(reviewId));
       allow create: if isAdmin()
         && reviewId.matches('^seed_.+')
-        && request.resource.data.keys().hasAll(['uid', 'phone', 'product'])
-        && request.resource.data.keys().hasOnly(['uid', 'phone', 'product'])
-        && isTestPhone(request.resource.data.phone)
-        && existsAfter(/databases/$(database)/documents/reviews/$(reviewId));
-      allow create: if request.resource.data.keys().hasAll(['uid', 'phone', 'product'])
-        && request.resource.data.keys().hasOnly(['uid', 'phone', 'product'])
-        && request.resource.data.uid == 'test'
-        && isTestPhone(request.resource.data.phone)
-        && reviewId == 'test_' + request.resource.data.phone + '_' + request.resource.data.product
+        && request.resource.data.keys().hasAll(['uid', 'product'])
+        && request.resource.data.keys().hasOnly(['uid', 'product'])
         && existsAfter(/databases/$(database)/documents/reviews/$(reviewId));
       allow read, delete: if isAdmin();
     }
