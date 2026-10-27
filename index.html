@@ -23,7 +23,11 @@
                 <img src="1.png" alt="Pachoncito" class="brand-logo" width="300" height="73">
             </div>
             <div class="badge">Reservas de Lunes a Viernes | Entregas los domingos</div>
-            <a href="cuenta.html" class="account-chip" id="accountChip">👤 <span id="accountName">Mi cuenta</span> · <strong id="napaBalance">0</strong> 🎁</a>
+            <a href="cuenta.html" class="account-chip" id="accountChip" aria-label="Mi cuenta y ñapas acumuladas">
+                <span data-icon="user"></span><span id="accountName">Mi cuenta</span>
+                <span class="chip-divider" aria-hidden="true"></span>
+                <span data-icon="gift"></span><strong id="napaBalance">0</strong>
+            </a>
         </header>
 
         <div id="installSlot"></div>
@@ -65,6 +69,42 @@
                 </div>
             </div>
 
+            <!-- Información alimentaria obligatoria (Reglamento UE 1169/2011): alérgenos visibles antes de comprar -->
+            <details class="food-info">
+                <summary>
+                    <span data-icon="clipboard"></span>
+                    <span>Información alimentaria y alérgenos</span>
+                    <span data-icon="chevron" class="chevron"></span>
+                </summary>
+                <div class="food-info-body">
+                    <p class="food-info-lead">Pandebonos de elaboración artesanal, horneados en pequeñas tandas cada domingo.</p>
+
+                    <h4 class="food-info-title">Alérgenos declarados</h4>
+                    <ul class="allergen-list">
+                        <li class="allergen">
+                            <span data-icon="milk" class="allergen-icon"></span>
+                            <span><strong>Lácteos</strong> Contienen queso.</span>
+                        </li>
+                        <li class="allergen">
+                            <span data-icon="egg" class="allergen-icon"></span>
+                            <span><strong>Huevo</strong> Se utiliza para el dorado exterior.</span>
+                        </li>
+                    </ul>
+                    <p class="food-info-note">
+                        <span data-icon="alert"></span>
+                        <span>Se elaboran en un obrador donde se manipulan otros alérgenos habituales, por lo que pueden contener trazas.
+                        Si tienes una alergia o intolerancia, escríbenos antes de hacer tu pedido.</span>
+                    </p>
+
+                    <h4 class="food-info-title">Consejo de consumo</h4>
+                    <p class="food-info-note">
+                        <span data-icon="flame"></span>
+                        <span>Están en su mejor momento el mismo domingo de la entrega. Si los tomas más tarde, dales un toque breve de calor
+                        (unos minutos en horno o sartén, o apenas unos segundos en microondas) para recuperar el exterior crujiente y el queso fundido.</span>
+                    </p>
+                </div>
+            </details>
+
             <div id="napaAlert" class="alert-box" aria-live="polite">
                 Por cada 10 € de pedido te regalamos una ñapa.
             </div>
@@ -100,15 +140,12 @@
 
         <footer class="site-footer">
             <nav class="footer-links" aria-label="Más opciones">
-                <a href="resenas.html" class="btn btn-secondary">⭐ Reseñas</a>
-                <a href="cuenta.html" class="btn btn-secondary">👤 Mi cuenta</a>
+                <a href="resenas.html" class="btn btn-secondary"><span data-icon="star"></span>Reseñas</a>
+                <a href="cuenta.html" class="btn btn-secondary"><span data-icon="user"></span>Mi cuenta</a>
             </nav>
+            <button type="button" class="btn btn-secondary" data-open-faq><span data-icon="question"></span>Preguntas frecuentes</button>
             <a href="https://www.instagram.com/pachoncito_oficial" target="_blank" rel="noopener noreferrer" class="instagram-link">
-                <svg class="instagram-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-                </svg>
+                <span data-icon="instagram" class="instagram-icon"></span>
                 <span>@pachoncito_oficial</span>
             </a>
         </footer>

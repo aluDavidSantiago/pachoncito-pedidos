@@ -8,13 +8,17 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { auth } from "./auth.js";
 import { isTestPhone, mountEnvBanner, TEST_MODE, TEST_PHONES_LABEL } from "./env.js";
+import { mountFaq } from "./faq.js";
 import { db } from "./firebase.js";
+import { hydrateIcons } from "./icons.js";
 import { isStandalone, mountInstallPrompt, registerServiceWorker } from "./pwa.js";
 import { endSession, getProfile, getSession, hasCompletedProfile, safeNext } from "./session.js";
 import { normalizePhone, showMessage, storage, withBusy } from "./shared.js";
 
 mountEnvBanner();
 registerServiceWorker();
+hydrateIcons();
+mountFaq();
 
 const $ = id => document.getElementById(id);
 const message = $('accessMessage');

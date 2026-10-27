@@ -1119,6 +1119,267 @@ input[readonly] {
     margin: 4px 0;
 }
 
+/* ---------- Iconos (icons.js) ---------- */
+
+.icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.btn .icon {
+    width: 18px;
+    height: 18px;
+}
+
+.account-chip .icon {
+    width: 17px;
+    height: 17px;
+    color: var(--accent);
+}
+
+.chip-divider {
+    width: 1px;
+    height: 16px;
+    margin: 0 4px;
+    background: var(--border);
+}
+
+/* ---------- Información alimentaria y alérgenos ---------- */
+
+.food-info {
+    margin: 4px 0 18px;
+    border: 1px solid var(--accent-border);
+    border-radius: var(--radius-md);
+    background: var(--surface-sunken);
+}
+
+.food-info summary,
+.faq-item summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: var(--tap);
+    padding: 10px 14px;
+    cursor: pointer;
+    list-style: none;
+    font-size: 15px;
+    font-weight: 500;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.food-info summary::-webkit-details-marker,
+.faq-item summary::-webkit-details-marker {
+    display: none;
+}
+
+.food-info summary .icon,
+.faq-icon {
+    color: var(--accent);
+}
+
+.chevron {
+    margin-left: auto;
+    color: var(--text-muted);
+    transition: transform 0.2s var(--ease);
+}
+
+details[open] > summary .chevron {
+    transform: rotate(180deg);
+}
+
+.food-info-body {
+    padding: 2px 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    animation: fadeDown 0.25s var(--ease);
+}
+
+.food-info-lead {
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.food-info-title {
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--accent);
+}
+
+.allergen-list {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 8px;
+}
+
+.allergen {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.allergen strong {
+    display: block;
+    color: var(--text);
+    font-size: 15px;
+}
+
+.allergen-icon {
+    width: 34px;
+    height: 34px;
+    padding: 6px;
+    border-radius: 50%;
+    color: var(--accent);
+    border: 1px solid var(--accent-border);
+    background: var(--accent-soft);
+}
+
+.food-info-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.food-info-note .icon {
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    color: var(--accent);
+}
+
+/* ---------- Preguntas frecuentes (faq.js) ---------- */
+
+.modal-faq {
+    width: min(100% - 32px, 560px);
+    max-height: 85dvh;
+    padding: 0;
+    overflow: auto;
+}
+
+.modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 12px 12px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+}
+
+.modal-header h2 {
+    font-size: 1.15rem;
+}
+
+.modal-close {
+    width: var(--tap);
+    height: var(--tap);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.faq-list {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px 16px;
+}
+
+.faq-item + .faq-item {
+    border-top: 1px solid var(--border);
+}
+
+.faq-item summary {
+    padding: 12px 8px;
+}
+
+.faq-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0 8px 16px 38px;
+    font-size: 15px;
+    color: var(--text-muted);
+    animation: fadeDown 0.25s var(--ease);
+}
+
+.faq-body strong {
+    color: var(--text);
+}
+
+.faq-body ul {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-left: 18px;
+}
+
+.faq-body li::marker {
+    color: var(--accent);
+}
+
+.faq-note {
+    font-size: 13px;
+}
+
+.contact-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.contact-btn {
+    width: auto;
+    flex: 1 1 200px;
+}
+
+.contact-btn .icon {
+    color: var(--accent);
+}
+
+/* Enlace en línea dentro de un texto (abre el modal de preguntas frecuentes) */
+.btn-inline {
+    display: inline;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--accent);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+
+.footer-faq {
+    margin-top: 10px;
+}
+
+@media (max-width: 480px) {
+    .faq-body {
+        padding-left: 8px;
+    }
+}
+
 /* ---------- Invitación a instalar la app (PWA) ---------- */
 
 .install-card {
@@ -1254,6 +1515,9 @@ body.has-env-banner {
 
 @media (hover: hover) {
     .btn-google:hover { background: #f2f2f2; }
+    .food-info summary:hover,
+    .faq-item summary:hover { color: var(--accent); }
+    .modal-close:hover { background: var(--surface-2); color: var(--text); }
     .product-card:hover {
         background: var(--surface-hover);
         border-color: var(--accent-border);

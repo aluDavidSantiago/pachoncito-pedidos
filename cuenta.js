@@ -1,7 +1,9 @@
 // Área del cliente recurrente: saldo de ñapas, historial de pedidos, código de invitación e instalación de la app.
 import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { mountEnvBanner } from "./env.js";
+import { mountFaq } from "./faq.js";
 import { db } from "./firebase.js";
+import { hydrateIcons } from "./icons.js";
 import { normalizeOrder } from "./orders.js";
 import { mountInstallPrompt, registerServiceWorker } from "./pwa.js";
 import { endSession, requireCustomer } from "./session.js";
@@ -9,6 +11,8 @@ import { el, formatDate, formatEUR, PRODUCT_NAMES, showMessage } from "./shared.
 
 mountEnvBanner();
 registerServiceWorker();
+hydrateIcons();
+mountFaq();
 
 const { session, profile } = await requireCustomer();
 const $ = id => document.getElementById(id);

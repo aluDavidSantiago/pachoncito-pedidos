@@ -2,13 +2,17 @@ import {
     collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { mountEnvBanner, TEST_MODE } from "./env.js";
+import { mountFaq } from "./faq.js";
 import { db } from "./firebase.js";
+import { hydrateIcons } from "./icons.js";
 import { registerServiceWorker } from "./pwa.js";
 import { requireCustomer } from "./session.js";
 import { el, formatDate, PRODUCT_NAMES, RATING_ASPECTS, showMessage, starsText, withBusy } from "./shared.js";
 
 mountEnvBanner();
 registerServiceWorker();
+hydrateIcons();
+mountFaq();
 
 const { session } = await requireCustomer();
 
@@ -121,7 +125,7 @@ async function markReviewedProducts() {
         if (!done) pending++;
     }
     $('submitReviewBtn').hidden = pending === 0;
-    if (pending === 0) showMessage(message, 'Ya has valorado todos nuestros productos. ¡Gracias por tu opinión! 🥖', 'success');
+    if (pending === 0) showMessage(message, 'Ya has valorado todos nuestros productos. Gracias por tu opinión.', 'success');
 }
 
 form.addEventListener('submit', async event => {
@@ -154,7 +158,7 @@ form.addEventListener('submit', async event => {
         await markReviewedProducts();
         showMessage(message, session.isTest
             ? '🧪 Reseña de prueba publicada. Solo se ve en modo pruebas (?pruebas=1) y en el panel.'
-            : '¡Gracias por tu valoración! 🎁 Revisaremos tu reseña y te guardaremos una ñapa para tu próximo pedido.', 'success');
+            : 'Gracias por tu valoración. La revisaremos y, si es la primera, te guardaremos una ñapa para tu próximo pedido.', 'success');
         loadReviews();
     } catch (error) {
         console.error('Error al publicar la reseña:', error);

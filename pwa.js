@@ -67,13 +67,13 @@ export function mountInstallPrompt(container, { afterSignup = false } = {}) {
                 render();
             };
             container.replaceChildren(installCard([
-                el('strong', { text: '📲 Instala Pachoncito' }),
+                el('strong', { text: 'Instala Pachoncito' }),
                 el('p', { text: 'Pide en un toque desde tu pantalla de inicio, como una app.' }),
                 el('button', { type: 'button', className: 'btn btn-small btn-install', onClick: install }, 'Instalar app')
             ], dismiss));
         } else if (isIOS()) {
             container.replaceChildren(installCard([
-                el('strong', { text: '📲 Añade Pachoncito a tu inicio' }),
+                el('strong', { text: 'Añade Pachoncito a tu inicio' }),
                 el('ol', { className: 'install-steps' },
                     el('li', {}, 'Pulsa ', el('strong', { text: 'Compartir' }), ' ', el('span', { className: 'ios-share', 'aria-hidden': 'true', text: '⎙' }), ' en la barra de Safari.'),
                     el('li', {}, 'Elige ', el('strong', { text: '«Añadir a pantalla de inicio»' }), '.')

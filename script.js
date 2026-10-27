@@ -1,6 +1,8 @@
 import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { mountEnvBanner } from "./env.js";
+import { mountFaq } from "./faq.js";
 import { db } from "./firebase.js";
+import { hydrateIcons } from "./icons.js";
 import { buildOrder, priceOrder } from "./orders.js";
 import { mountInstallPrompt, registerServiceWorker } from "./pwa.js";
 import { requireCustomer } from "./session.js";
@@ -8,6 +10,8 @@ import { el, formatEUR, MAX_QTY, NAPA_EVERY_CENTS, PRICES_CENTS, showMessage, st
 
 mountEnvBanner();
 registerServiceWorker();
+hydrateIcons();
+mountFaq();
 
 // Auth wall: sin sesión o sin alta completa se redirige a acceso.html y se vuelve aquí después
 const { session, profile } = await requireCustomer();

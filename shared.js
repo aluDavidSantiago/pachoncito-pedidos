@@ -11,6 +11,13 @@ export const PRODUCT_NAMES = {
     bocadillo: 'Con Bocadillo (Guayaba)'
 };
 
+// Canales de atención al cliente. whatsapp: número en formato internacional sin "+" ni espacios
+// (p. ej. '34600123456'); si se deja vacío, el botón de WhatsApp no se muestra.
+export const CONTACT = {
+    instagram: 'pachoncito_oficial',
+    whatsapp: ''
+};
+
 export const RATING_ASPECTS = [
     ['producto', 'Producto'],
     ['entrega', 'Entrega'],
