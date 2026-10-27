@@ -5,40 +5,89 @@ import {
     runTransaction, serverTimestamp, updateDoc, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import {
+    biometricAvailable, biometricErrorMessage, biometricLabel, biometricOfferDeclined, declineBiometricOffer,
+    enrollBiometric, forgetBiometric, getEnrollment, isUnlocked, lockPanel, markUnlocked, verifyBiometric
+} from "./admin-biometric.js";
+import {
+    ensureCostData, parseEuros, renderCostMonitor, renderShoppingList, unitCosts,
+    updateCostSettings, updateIngredientSpec, updatePackPrice, watchCostData
+} from "./admin-costs.js";
 import { adminAuth, adminDb as db } from "./admin-firebase.js";
 import { mountEnvBanner, TEST_CUSTOMERS, TEST_PHONES_LABEL, USE_EMULATORS } from "./env.js";
+import { hydrateIcons, icon } from "./icons.js";
 import { completeOrder, normalizeOrder } from "./orders.js";
 import { clearTestData, seedTestData } from "./seeder.js";
-import { initUI } from "./ui.js";
 import { el, formatDate, formatEUR, normalizePhone, PRODUCT_NAMES, RATING_ASPECTS, showMessage, starsText, withBusy } from "./shared.js";
+import { closeDialog, initUI, toast } from "./ui.js";
+
+// Única cuenta admitida en el panel. La autorización real la da el documento admins/{uid} (firestore.rules).
+const ADMIN_EMAIL = 'ds2.6hc@gmail.com';
 
 mountEnvBanner();
+hydrateIcons();
 initUI();
 const $ = id => document.getElementById(id);
-const adminMessage = $('adminMessage');
 
 const STATUS = {
     pending: { text: 'Pendiente', action: 'Pendiente', className: 'status-pending' },
     preparing: { text: 'En preparación', action: 'Preparando', className: 'status-preparing' },
     ready: { text: 'Listo', action: 'Listo', className: 'status-ready' },
     completed: { text: 'Entregado', action: 'Entregado', className: 'status-completed' },
-    rejected: { text: 'Rechazado', action: 'Rechazar', className: 'status-rejected' }
+    rejected: { text: 'Cancelado', action: 'Cancelar', className: 'status-rejected' }
+};
+
+const TABS = {
+    pendientes: ['pending', 'preparing'],
+    listos: ['ready'],
+    completados: ['completed'],
+    cancelados: ['rejected']
 };
 
 let orders = [];
 let customers = new Map(); // uid → expediente
 let reviews = [];
-let production = { clasicos: 0, bocadillos: 0, napas: 0, ingresosCents: 0 };
+let costData = null;
 let unsubscribers = [];
+const filters = { sunday: currentSundayKey(), tab: 'pendientes', search: '' };
 
-// ---------- Autenticación (email y contraseña, sin cambios para el obrador) ----------
+// ---------- Vistas ----------
 
 function showView(view) {
     $('authStatus').hidden = view !== 'loading';
     $('loginView').hidden = view !== 'login';
+    $('lockView').hidden = view !== 'lock';
     $('dashboard').hidden = view !== 'dashboard';
     $('logoutBtn').hidden = view !== 'dashboard';
+    if (view !== 'dashboard') {
+        $('lockBtn').hidden = true;
+        $('biometricToggleBtn').hidden = true;
+    }
 }
+
+function showLoginView(message) {
+    showView('login');
+    $('adminEmail').value ||= ADMIN_EMAIL;
+    showMessage($('loginMessage'), message || '', 'error');
+    biometricAvailable().then(available => { $('biometricLoginHint').hidden = !available; });
+}
+
+// Icono y textos de la biometría del dispositivo (Face ID, Touch ID, huella…)
+function applyBiometricLabels() {
+    const label = biometricLabel();
+    const iconName = label === 'Face ID' ? 'faceid' : 'fingerprint';
+    document.querySelectorAll('.lock-glyph .icon, .btn-biometric .icon').forEach(node => {
+        node.replaceWith(icon(iconName, node.getAttribute('class')));
+    });
+    $('biometricLoginLabel').textContent = `Entrar con ${label}`;
+    $('lockDesc').textContent = `Desbloquéalo con ${label} para ver los pedidos.`;
+    $('biometricOfferTitle').textContent = `¿Activar ${label}?`;
+    $('biometricOfferText').textContent = `Accede más rápido al panel: tu sesión se quedará en este dispositivo y se desbloqueará con ${label}.`;
+    $('biometricLoginHint').textContent = `Tras entrar con tu contraseña en este dispositivo podrás desbloquear el panel con ${label}.`;
+}
+applyBiometricLabels();
+
+// ---------- Acceso manual (email y contraseña) ----------
 
 function loginErrorMessage(error) {
     switch (error?.code) {
@@ -53,25 +102,118 @@ function loginErrorMessage(error) {
 
 $('loginForm').addEventListener('submit', async event => {
     event.preventDefault();
-    const email = $('adminEmail').value.trim();
+    const email = $('adminEmail').value.trim().toLowerCase();
     const password = $('adminPassword').value;
     if (!email || !password) {
         showMessage($('loginMessage'), 'Introduce email y contraseña.', 'error');
         return;
     }
+    if (email !== ADMIN_EMAIL) {
+        showMessage($('loginMessage'), 'Este panel solo admite la cuenta del obrador.', 'error');
+        return;
+    }
     try {
+        markUnlocked(); // quien acaba de escribir la contraseña no necesita además Face ID
         await withBusy(event.submitter, 'Entrando…', () => signInWithEmailAndPassword(adminAuth, email, password));
+        $('adminPassword').value = '';
     } catch (error) {
+        lockPanel();
         showMessage($('loginMessage'), loginErrorMessage(error), 'error');
     }
 });
 
-$('logoutBtn').addEventListener('click', () => signOut(adminAuth));
+$('logoutBtn').addEventListener('click', () => {
+    lockPanel();
+    signOut(adminAuth);
+});
+
+// ---------- Bloqueo y desbloqueo biométrico ----------
+
+$('lockBtn').addEventListener('click', () => {
+    lockPanel();
+    stopListeners();
+    showView('lock');
+});
+
+$('biometricLoginBtn').addEventListener('click', async event => {
+    const user = adminAuth.currentUser;
+    const enrollment = getEnrollment(user?.uid);
+    if (!user || !enrollment) {
+        showLoginView();
+        return;
+    }
+    try {
+        await withBusy(event.currentTarget, 'Verificando…', () => verifyBiometric(enrollment));
+        showMessage($('lockMessage'), '');
+        enterDashboard(user);
+    } catch (error) {
+        showMessage($('lockMessage'), biometricErrorMessage(error), 'error');
+    }
+});
+
+$('usePasswordBtn').addEventListener('click', () => {
+    lockPanel();
+    signOut(adminAuth); // cierra la sesión guardada: se vuelve a entrar con contraseña
+});
+
+async function updateBiometricControls(user) {
+    const available = await biometricAvailable();
+    const enrolled = Boolean(getEnrollment(user.uid));
+    const toggle = $('biometricToggleBtn');
+    toggle.hidden = !available;
+    toggle.replaceChildren(icon(biometricLabel() === 'Face ID' ? 'faceid' : 'fingerprint'),
+        enrolled ? `${biometricLabel()} activado` : `Activar ${biometricLabel()}`);
+    toggle.classList.toggle('is-active', enrolled);
+    $('lockBtn').hidden = !enrolled;
+    return { available, enrolled };
+}
+
+async function startEnrollment(user) {
+    try {
+        await enrollBiometric(user);
+        toast(`${biometricLabel()} activado: la próxima vez desbloquearás el panel al instante.`, 'success');
+    } catch (error) {
+        toast(biometricErrorMessage(error), 'error');
+    }
+    updateBiometricControls(user);
+}
+
+$('biometricToggleBtn').addEventListener('click', () => {
+    const user = adminAuth.currentUser;
+    if (!user) return;
+    if (getEnrollment(user.uid)) {
+        if (!confirm(`¿Desactivar ${biometricLabel()} en este dispositivo?`)) return;
+        forgetBiometric();
+        markUnlocked();
+        updateBiometricControls(user);
+        toast(`${biometricLabel()} desactivado en este dispositivo.`);
+    } else {
+        startEnrollment(user); // directamente en el gesto del usuario (lo exige Safari)
+    }
+});
+
+$('biometricOfferYes').addEventListener('click', () => {
+    const user = adminAuth.currentUser;
+    closeDialog($('biometricOffer'));
+    if (user) startEnrollment(user);
+});
+
+$('biometricOfferNo').addEventListener('click', () => {
+    declineBiometricOffer();
+    closeDialog($('biometricOffer'));
+});
+
+// ---------- Sesión ----------
 
 onAuthStateChanged(adminAuth, async user => {
     stopListeners();
     if (!user) {
-        showView('login');
+        showLoginView();
+        return;
+    }
+    if ((user.email || '').toLowerCase() !== ADMIN_EMAIL) {
+        await signOut(adminAuth);
+        showLoginView('Este panel solo admite la cuenta del obrador.');
         return;
     }
 
@@ -82,42 +224,69 @@ onAuthStateChanged(adminAuth, async user => {
     } catch (error) {
         console.error('Error comprobando permisos:', error);
     }
-
     if (!isAdmin) {
-        await signOut(adminAuth); // la instancia del panel solo guarda sesiones de administrador
-        showView('login');
-        showMessage($('loginMessage'), 'Esta cuenta no tiene permisos de administración.', 'error');
+        await signOut(adminAuth);
+        showLoginView('Esta cuenta no tiene permisos de administración.');
         return;
     }
 
+    // Con Face ID activado, la sesión guardada abre el panel bloqueado hasta verificar
+    if (getEnrollment(user.uid) && !isUnlocked()) {
+        showMessage($('lockMessage'), '');
+        showView('lock');
+        return;
+    }
+    enterDashboard(user);
+});
+
+async function enterDashboard(user) {
     showMessage($('loginMessage'), '');
-    $('loginForm').reset();
     showView('dashboard');
     startListeners();
-});
+    const { available, enrolled } = await updateBiometricControls(user);
+    if (available && !enrolled && !biometricOfferDeclined()) $('biometricOffer').showModal();
+}
 
 // ---------- Datos en tiempo real ----------
 
 function startListeners() {
+    if (unsubscribers.length) return;
     const onError = error => {
         console.error('Error de Firestore:', error);
-        showMessage(adminMessage, 'Se perdió la conexión con la base de datos o faltan permisos.', 'error');
+        toast('Se perdió la conexión con la base de datos o faltan permisos.', 'error');
     };
 
     unsubscribers = [
         onSnapshot(query(collection(db, 'orders'), orderBy('createdAt', 'desc')), snap => {
             orders = snap.docs.map(normalizeOrder);
-            renderOrdersAndStats();
+            renderAll();
         }, onError),
         onSnapshot(collection(db, 'customers'), snap => {
             customers = new Map(snap.docs.map(d => [d.id, d.data()]));
-            renderOrdersAndStats();
+            renderAll();
         }, onError),
         onSnapshot(query(collection(db, 'reviews'), orderBy('createdAt', 'desc'), limit(100)), snap => {
             reviews = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             renderReviews();
         }, onError)
     ];
+
+    ensureCostData(db)
+        .then(() => {
+            if (!unsubscribers.length) return; // se cerró la sesión mientras tanto
+            unsubscribers.push(...watchCostData(db, data => {
+                costData = data;
+                renderCosts();
+                renderProduction();
+            }, onError));
+        })
+        .catch(error => {
+            console.error('Error preparando los costes:', error);
+            $('costMonitor').replaceChildren(el('p', {
+                className: 'empty-state',
+                text: 'No se pudieron cargar los costes. ¿Has desplegado las reglas nuevas (ingredients y settings)?'
+            }));
+        });
 }
 
 function stopListeners() {
@@ -126,7 +295,65 @@ function stopListeners() {
     orders = [];
     customers = new Map();
     reviews = [];
+    costData = null;
 }
+
+function renderAll() {
+    renderSundayOptions();
+    renderProduction();
+    renderOrders();
+}
+
+// ---------- Domingos de entrega ----------
+
+// Declaraciones de función (no const): `filters` las usa al cargar el módulo, antes de esta línea
+function pad(n) {
+    return String(n).padStart(2, '0');
+}
+
+function dateKey(d) {
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// Se reserva de lunes a viernes para el domingo siguiente (un pedido hecho en domingo es para el siguiente)
+function sundayKeyFor(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + (d.getDay() === 0 ? 7 : 7 - d.getDay()));
+    return dateKey(d);
+}
+
+// Domingo en curso: hoy si es domingo; si no, el próximo
+function currentSundayKey() {
+    const today = new Date();
+    return today.getDay() === 0 ? dateKey(today) : sundayKeyFor(today);
+}
+
+const orderSunday = order => sundayKeyFor(order.createdAt?.toDate?.() ?? new Date());
+
+function sundayLabel(key) {
+    const label = new Date(`${key}T12:00:00`).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
+    return key === currentSundayKey() ? `Este domingo · ${label}` : `Domingo ${label}`;
+}
+
+function renderSundayOptions() {
+    const keys = [...new Set([currentSundayKey(), ...orders.map(orderSunday)])].sort().reverse();
+    const select = $('sundaySelect');
+    select.replaceChildren(
+        ...keys.map(key => new Option(sundayLabel(key), key, false, key === filters.sunday)),
+        new Option('Todos los domingos', 'all', false, filters.sunday === 'all')
+    );
+}
+
+$('sundaySelect').addEventListener('change', event => {
+    filters.sunday = event.target.value;
+    renderProduction();
+    renderOrders();
+});
+
+const ordersOfSunday = () => (filters.sunday === 'all' ? orders : orders.filter(o => orderSunday(o) === filters.sunday));
+
+// ---------- Producción y finanzas del domingo ----------
 
 const customerOf = order => (order.uid ? customers.get(order.uid) : null);
 
@@ -136,24 +363,15 @@ function accumulatedNapas(order) {
     return customerOf(order)?.napaCredits || 0;
 }
 
-function renderOrdersAndStats() {
-    renderStats();
-    renderOrders();
-}
-
-// ---------- Producción y finanzas ----------
-
-function renderStats() {
+function productionOf(list) {
     let clasicos = 0, bocadillos = 0, napas = 0, ingresosCents = 0;
     const customersWithCredits = new Set();
-
-    for (const order of orders) {
+    for (const order of list) {
         if (order.status === 'rejected') continue;
         clasicos += order.items?.clasico || 0;
         bocadillos += order.items?.bocadillo || 0;
         napas += order.napaCount;
         ingresosCents += order.totalCents;
-
         if (order.status === 'completed') {
             napas += order.creditsRedeemed || 0;
         } else if (order.uid && !customersWithCredits.has(order.uid)) {
@@ -162,53 +380,59 @@ function renderStats() {
             napas += customerOf(order)?.napaCredits || 0;
         }
     }
-
-    $('totalClasicos').textContent = clasicos;
-    $('totalBocadillo').textContent = bocadillos;
-    $('totalNapas').textContent = napas;
-    production = { clasicos, bocadillos, napas, ingresosCents };
-    recalcularCostes();
+    return { clasicos, bocadillos, napas, units: clasicos + bocadillos + napas, ingresosCents };
 }
 
-function ingredientRow(name, amount, extraClass) {
-    return el('div', { className: `ingredient-item ${extraClass || ''}` }, name, el('strong', { text: amount }));
+function renderProduction() {
+    const p = productionOf(ordersOfSunday());
+    const perBatch = costData?.settings.unitsPerBatch || 16;
+    const batches = Math.ceil(p.units / perBatch);
+    // Las ñapas son pandebonos clásicos de regalo: cuentan como coste, no como ingreso
+    const costs = costData ? unitCosts(costData) : null;
+    const costCents = costs ? (p.clasicos + p.napas) * costs.clasico + p.bocadillos * costs.bocadillo : 0;
+
+    $('kpiTotal').textContent = p.units;
+    $('kpiBatches').textContent = `${batches} ${batches === 1 ? 'tanda' : 'tandas'} de ${perBatch}`;
+    $('kpiClasicos').textContent = p.clasicos;
+    $('kpiBocadillo').textContent = p.bocadillos;
+    $('kpiNapas').textContent = p.napas;
+    $('kpiIngresos').textContent = formatEUR(p.ingresosCents);
+    $('kpiCoste').textContent = costs ? formatEUR(Math.round(costCents)) : '—';
+    $('kpiBeneficio').textContent = costs ? formatEUR(Math.round(p.ingresosCents - costCents)) : '—';
+
+    if (costData) renderShoppingList($('listaCompraBox'), costData, { units: p.units, bocadillos: p.bocadillos });
 }
 
-function recalcularCostes() {
-    const { clasicos, bocadillos, napas, ingresosCents } = production;
-    // Las ñapas también se hornean, así que cuentan para la producción
-    const totalPanes = clasicos + bocadillos + napas;
-    const listaCompraBox = $('listaCompraBox');
+// ---------- Encargos: pestañas, buscador y tarjetas ----------
 
-    if (totalPanes === 0) {
-        listaCompraBox.replaceChildren(el('div', { className: 'ingredient-item', text: 'Sin pedidos activos' }));
-        $('totalInversion').textContent = formatEUR(0);
-        $('totalBeneficio').textContent = formatEUR(0);
-        return;
+function matchesSearch(order) {
+    const q = filters.search.trim().toLowerCase();
+    if (!q) return true;
+    const digits = q.replace(/\D/g, '');
+    return (order.customerName || '').toLowerCase().includes(q)
+        || (digits.length >= 3 && (order.phone || '').replace(/\D/g, '').includes(digits));
+}
+
+function renderTabs(list) {
+    for (const [tab, statuses] of Object.entries(TABS)) {
+        document.querySelector(`[data-count="${tab}"]`).textContent = list.filter(o => statuses.includes(o.status)).length;
     }
-
-    const tandas = Math.ceil(totalPanes / 16);
-    listaCompraBox.replaceChildren(
-[línea retirada: dato privado del obrador]
-[línea retirada: dato privado del obrador]
-[línea retirada: dato privado del obrador]
-[línea retirada: dato privado del obrador]
-        ingredientRow('Huevos L (Estuche 12u)', `${Math.ceil((tandas * 2) / 12)} estuche(s)`),
-        ingredientRow('Pasta Guayaba (1kg)', `${bocadillos > 0 ? Math.ceil((bocadillos * 15) / 1000) : 0} bloque(s)`),
-        ingredientRow('Tandas de producción (16u)', `${tandas} tanda(s)`, 'is-total')
-    );
-
-    const costeTanda = [...document.querySelectorAll('.cost-input')]
-        .reduce((sum, input) => sum + (parseFloat(input.value) || 0), 0);
-    const inversionCents = Math.round(tandas * costeTanda * 100);
-
-    $('totalInversion').textContent = formatEUR(inversionCents);
-    $('totalBeneficio').textContent = formatEUR(ingresosCents - inversionCents);
+    const buttons = [...document.querySelectorAll('#statusTabs [data-tab]')];
+    buttons.forEach(button => button.setAttribute('aria-selected', String(button.dataset.tab === filters.tab)));
+    $('statusTabs').style.setProperty('--tab-index', buttons.findIndex(b => b.dataset.tab === filters.tab));
 }
 
-document.querySelectorAll('.cost-input').forEach(input => input.addEventListener('input', recalcularCostes));
+document.querySelectorAll('#statusTabs [data-tab]').forEach(button => {
+    button.addEventListener('click', () => {
+        filters.tab = button.dataset.tab;
+        renderOrders();
+    });
+});
 
-// ---------- Pedidos ----------
+$('orderSearch').addEventListener('input', event => {
+    filters.search = event.target.value;
+    renderOrders();
+});
 
 function metaLine(...parts) {
     return el('p', {}, ...parts);
@@ -220,42 +444,39 @@ function orderCard(order) {
     const credits = accumulatedNapas(order);
     const customer = customerOf(order);
     const phoneNode = order.phoneKey
-        ? el('a', { className: 'order-phone', href: `tel:${order.phoneKey}`, text: `📞 ${order.phone}` })
-        : el('span', { className: 'order-phone', text: `📞 ${order.phone || 'Sin teléfono'}` });
+        ? el('a', { className: 'order-phone', href: `tel:${order.phoneKey}`, text: order.phone })
+        : el('span', { className: 'order-phone', text: order.phone || 'Sin teléfono' });
 
     const meta = el('div', { className: 'order-meta' },
-        metaLine('🥖 ', el('strong', { text: 'Clásicos:' }), ` ${order.items?.clasico || 0} · 🫓 `,
+        metaLine(el('strong', { text: 'Clásicos:' }), ` ${order.items?.clasico || 0} · `,
             el('strong', { text: 'Bocadillo:' }), ` ${order.items?.bocadillo || 0}`),
-        metaLine('📦 ', el('strong', { text: 'Entrega:' }), ' ',
-            order.deliveryMethod === 'domicilio' ? `A domicilio — ${order.address}` : 'Recogida en local'),
-        metaLine('⏰ ', el('strong', { text: 'Hora:' }), ` ${order.deliverySlot || '—'} · 💰 `,
+        metaLine(el('strong', { text: 'Entrega:' }), ' ',
+            order.deliveryMethod === 'domicilio' ? `A domicilio — ${order.address}` : 'Recogida en el obrador'),
+        metaLine(el('strong', { text: 'Hora:' }), ` ${order.deliverySlot || '—'} · `,
             el('strong', { text: 'Total:' }), ` ${formatEUR(order.totalCents)}`),
-        order.createdAt ? metaLine('📅 ', formatDate(order.createdAt)) : null,
+        order.createdAt ? metaLine(`Reservado el ${formatDate(order.createdAt)}`) : null,
         !order.uid
             ? el('p', { className: 'meta-accent', text: 'Pedido anterior a las cuentas de cliente' })
-            : el('p', { className: customer?.phoneVerified ? 'meta-success' : 'meta-accent',
-                text: customer?.phoneVerified
-                    ? '📱 Teléfono confirmado'
-                    : '📱 Teléfono sin confirmar: compruébalo al entregar' }),
+            : el('p', {
+                className: customer?.phoneVerified ? 'meta-success' : 'meta-accent',
+                text: customer?.phoneVerified ? 'Teléfono confirmado' : 'Teléfono sin confirmar: compruébalo al entregar'
+            }),
         order.napaCount > 0
-            ? el('p', { className: 'meta-success', text: `🎁 Incluye ${order.napaCount} ${order.napaCount === 1 ? 'ñapa' : 'ñapas'} por volumen de compra` })
+            ? el('p', { className: 'meta-success', text: `Incluye ${order.napaCount} ${order.napaCount === 1 ? 'ñapa' : 'ñapas'} por volumen de compra` })
             : null,
         credits > 0
             ? el('p', {
                 className: 'meta-success',
                 text: isClosed
-                    ? `🎁 Se entregaron ${credits} ${credits === 1 ? 'ñapa acumulada' : 'ñapas acumuladas'} (invitaciones / reseñas)`
-                    : `🎁 +${credits} ${credits === 1 ? 'ñapa acumulada' : 'ñapas acumuladas'} (invitaciones / reseñas): entrégalas en este pedido`
+                    ? `Se entregaron ${credits} ${credits === 1 ? 'ñapa acumulada' : 'ñapas acumuladas'} (invitaciones / reseñas)`
+                    : `+${credits} ${credits === 1 ? 'ñapa acumulada' : 'ñapas acumuladas'} (invitaciones / reseñas): entrégalas en este pedido`
             })
             : null,
         customer?.referredByCode && !customer.completedOrders
-            ? el('p', { className: 'meta-accent', text: `🤝 Invitado con el código ${customer.referredByCode}: su recomendador gana una ñapa al entregar este primer pedido` })
+            ? el('p', { className: 'meta-accent', text: `Invitado con el código ${customer.referredByCode}: su recomendador gana una ñapa al entregar este primer pedido` })
             : null,
         order.referralRewarded
-            ? el('p', { className: 'meta-success', text: '🤝 Ñapa de invitación concedida al recomendador' })
-            : null,
-        order.status === 'rejected'
-            ? el('p', { className: 'meta-danger', text: '❌ Pedido rechazado por el obrador' })
+            ? el('p', { className: 'meta-success', text: 'Ñapa de invitación concedida al recomendador' })
             : null
     );
 
@@ -270,13 +491,13 @@ function orderCard(order) {
             type: 'button',
             className: 'btn btn-small btn-danger',
             onClick: () => deleteOrder(order.id)
-        }, '🗑️ Borrar')
+        }, 'Borrar')
     );
 
     return el('article', { className: 'order-card' },
         el('div', { className: 'order-info' },
             el('h3', {}, order.customerName || 'Sin nombre', phoneNode,
-                order.test ? el('span', { className: 'test-tag', text: '🧪 Prueba' }) : null),
+                order.test ? el('span', { className: 'test-tag', text: 'Prueba' }) : null),
             meta,
             actions
         ),
@@ -285,12 +506,16 @@ function orderCard(order) {
 }
 
 function renderOrders() {
+    const searched = ordersOfSunday().filter(matchesSearch);
+    renderTabs(searched);
+    const visible = searched.filter(o => TABS[filters.tab].includes(o.status));
     const container = $('ordersContainer');
-    if (!orders.length) {
-        container.replaceChildren(el('p', { className: 'empty-state', text: 'No hay pedidos registrados todavía.' }));
+    if (!visible.length) {
+        const empty = filters.search ? 'Ningún encargo coincide con la búsqueda.' : 'No hay encargos en esta pestaña.';
+        container.replaceChildren(el('p', { className: 'empty-state', text: empty }));
         return;
     }
-    container.replaceChildren(...orders.map(orderCard));
+    container.replaceChildren(...visible.map(orderCard));
 }
 
 async function changeStatus(order, newStatus, button) {
@@ -304,17 +529,18 @@ async function changeStatus(order, newStatus, button) {
             if (result) {
                 const notes = ['Pedido entregado y registrado.'];
                 if (result.creditsRedeemed) notes.push(`Ñapas acumuladas canjeadas: ${result.creditsRedeemed}.`);
-                if (result.referrerRewarded) notes.push('El recomendador ha ganado una ñapa para su próximo pedido.');
+                if (result.referrerRewarded) notes.push('El recomendador ha ganado una ñapa.');
                 if (result.legacyMerged) notes.push('Se ha fusionado su historial anterior.');
                 if (result.warning) notes.push(result.warning);
-                showMessage(adminMessage, notes.join(' '), result.warning ? 'info' : 'success');
+                toast(notes.join(' '), result.warning ? 'info' : 'success');
             }
         } else {
             await updateDoc(doc(db, 'orders', order.id), { status: newStatus });
+            toast(`${order.customerName || 'Pedido'}: ${STATUS[newStatus].text.toLowerCase()}.`, 'success');
         }
     } catch (error) {
         console.error('Error al actualizar estado:', error);
-        showMessage(adminMessage, 'No se pudo actualizar el pedido.', 'error');
+        toast('No se pudo actualizar el pedido.', 'error');
     }
 }
 
@@ -322,10 +548,69 @@ async function deleteOrder(orderId) {
     if (!confirm('¿Seguro que quieres eliminar este pedido permanentemente?')) return;
     try {
         await deleteDoc(doc(db, 'orders', orderId));
+        toast('Pedido eliminado.');
     } catch (error) {
         console.error('Error al eliminar pedido:', error);
-        showMessage(adminMessage, 'No se pudo eliminar el pedido.', 'error');
+        toast('No se pudo eliminar el pedido.', 'error');
     }
+}
+
+// ---------- Monitor de costes ----------
+
+const costHandlers = {
+    async onPrice(ingredient, input) {
+        const cents = parseEuros(input.value);
+        if (cents === null) {
+            toast('Introduce un precio válido (por ejemplo 1,95).', 'error');
+            return;
+        }
+        if (cents === ingredient.packPriceCents) {
+            toast(`${ingredient.name}: el precio no ha cambiado.`);
+            return;
+        }
+        try {
+            await updatePackPrice(db, ingredient, cents);
+            toast(`${ingredient.name}: ${formatEUR(ingredient.packPriceCents ?? 0)} → ${formatEUR(cents)}`, 'success');
+        } catch (error) {
+            console.error('Error al actualizar el precio:', error);
+            toast('No se pudo guardar el precio.', 'error');
+        }
+    },
+    async onSpec(ingredient, amountInput, usageInput) {
+        const packAmount = parseFloat(String(amountInput.value).replace(',', '.'));
+        const usageRaw = String(usageInput.value).trim();
+        const usage = usageRaw === '' ? null : parseFloat(usageRaw.replace(',', '.'));
+        if (!(packAmount > 0) || (usage !== null && !(usage >= 0))) {
+            toast('Revisa el contenido del envase y la cantidad usada.', 'error');
+            return;
+        }
+        try {
+            await updateIngredientSpec(db, ingredient, { packAmount, usage });
+            toast(`${ingredient.name}: formato y receta guardados.`, 'success');
+        } catch (error) {
+            console.error('Error al guardar el formato:', error);
+            toast('No se pudo guardar.', 'error');
+        }
+    },
+    async onSettings(otherInput, unitsInput) {
+        const otherPerBatchCents = parseEuros(otherInput.value);
+        const unitsPerBatch = parseInt(unitsInput.value, 10);
+        if (otherPerBatchCents === null || !(unitsPerBatch > 0)) {
+            toast('Revisa el importe y el tamaño de la tanda.', 'error');
+            return;
+        }
+        try {
+            await updateCostSettings(db, { otherPerBatchCents, unitsPerBatch });
+            toast('Costes generales guardados.', 'success');
+        } catch (error) {
+            console.error('Error al guardar los ajustes:', error);
+            toast('No se pudo guardar.', 'error');
+        }
+    }
+};
+
+function renderCosts() {
+    if (costData) renderCostMonitor($('costMonitor'), costData, costHandlers);
 }
 
 // ---------- Reseñas ----------
@@ -338,22 +623,22 @@ function reviewCard(review) {
     return el('article', { className: 'order-card' },
         el('div', { className: 'order-info' },
             el('h3', {}, PRODUCT_NAMES[review.product] || review.product,
-                review.test ? el('span', { className: 'test-tag', text: '🧪 Prueba' }) : null),
+                review.test ? el('span', { className: 'test-tag', text: 'Prueba' }) : null),
             el('p', { className: 'order-meta stars-static', text: scores }),
             review.comment ? el('p', { className: 'review-comment', text: review.comment }) : null,
             el('p', { className: 'order-meta', text: formatDate(review.createdAt) }),
-            review.rewarded ? el('p', { className: 'meta-success', text: '🎁 Reseña recompensada' }) : null,
+            review.rewarded ? el('p', { className: 'meta-success', text: 'Reseña recompensada' }) : null,
             el('div', { className: 'actions-bar' },
                 review.rewarded ? null : el('button', {
                     type: 'button',
                     className: 'btn btn-small',
                     onClick: event => rewardReview(review.id, event.currentTarget)
-                }, '🎁 Dar ñapa por feedback'),
+                }, icon('gift'), 'Dar ñapa por feedback'),
                 el('button', {
                     type: 'button',
                     className: 'btn btn-small btn-danger',
                     onClick: () => deleteReview(review.id)
-                }, '🗑️ Eliminar')
+                }, 'Eliminar')
             )
         )
     );
@@ -401,10 +686,10 @@ async function rewardReview(reviewId, button) {
             'no-customer': ['No se encontró al cliente de esta reseña.', 'error'],
             already: ['Esta reseña ya estaba recompensada.', 'info']
         };
-        showMessage(adminMessage, ...messages[outcome]);
+        toast(...messages[outcome]);
     } catch (error) {
         console.error('Error al recompensar reseña:', error);
-        showMessage(adminMessage, 'No se pudo recompensar la reseña.', 'error');
+        toast('No se pudo recompensar la reseña.', 'error');
     }
 }
 
@@ -415,9 +700,10 @@ async function deleteReview(reviewId) {
         batch.delete(doc(db, 'reviews', reviewId));
         batch.delete(doc(db, 'reviewAuthors', reviewId));
         await batch.commit();
+        toast('Reseña eliminada.');
     } catch (error) {
         console.error('Error al eliminar reseña:', error);
-        showMessage(adminMessage, 'No se pudo eliminar la reseña.', 'error');
+        toast('No se pudo eliminar la reseña.', 'error');
     }
 }
 
@@ -479,8 +765,8 @@ $('seedBtn').addEventListener('click', async event => {
     if (!confirmTarget('generar datos de prueba')) return;
     try {
         const result = await withBusy(event.currentTarget, 'Generando…',
-            () => seedTestData(db, step => showMessage(seedMessage, `🧪 ${step}…`)));
-        showMessage(seedMessage, `🧪 Datos de prueba listos: ${result.customers} clientes, ${result.orders} pedidos y ${result.reviews} reseñas.`, 'success');
+            () => seedTestData(db, step => showMessage(seedMessage, `${step}…`)));
+        showMessage(seedMessage, `Datos de prueba listos: ${result.customers} clientes, ${result.orders} pedidos y ${result.reviews} reseñas.`, 'success');
     } catch (error) {
         console.error('Error generando datos de prueba:', error);
         showMessage(seedMessage, seedErrorMessage(error), 'error');
@@ -491,7 +777,7 @@ $('clearSeedBtn').addEventListener('click', async event => {
     if (!confirmTarget('borrar los datos de prueba')) return;
     try {
         const result = await withBusy(event.currentTarget, 'Borrando…', () => clearTestData(db));
-        showMessage(seedMessage, `🧹 Borrados ${result.customers} clientes, ${result.orders} pedidos y ${result.reviews} reseñas de prueba.`, 'success');
+        showMessage(seedMessage, `Borrados ${result.customers} clientes, ${result.orders} pedidos y ${result.reviews} reseñas de prueba.`, 'success');
     } catch (error) {
         console.error('Error borrando datos de prueba:', error);
         showMessage(seedMessage, seedErrorMessage(error), 'error');

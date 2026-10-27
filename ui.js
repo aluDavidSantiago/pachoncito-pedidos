@@ -44,6 +44,27 @@ export function bump(node) {
     node.classList.add('bump');
 }
 
+// Aviso flotante (vidrio esmerilado) que entra desde abajo y se retira solo
+let toastNode = null;
+let toastTimer = null;
+
+export function toast(text, type = 'info') {
+    if (!toastNode) {
+        toastNode = document.createElement('div');
+        toastNode.className = 'toast';
+        toastNode.setAttribute('role', 'status');
+        toastNode.setAttribute('aria-live', 'polite');
+        document.body.append(toastNode);
+    }
+    toastNode.textContent = text;
+    toastNode.dataset.type = type;
+    toastNode.classList.remove('is-visible');
+    void toastNode.offsetWidth;
+    toastNode.classList.add('is-visible');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastNode.classList.remove('is-visible'), type === 'error' ? 6000 : 3500);
+}
+
 export function initUI() {
     // iOS Safari solo aplica :active (la respuesta al tocar) si la página escucha toques
     document.addEventListener('touchstart', () => {}, { passive: true });

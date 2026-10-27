@@ -26,6 +26,9 @@ Plataforma web desarrollada para la gestión, procesamiento y control de pedidos
 | `resenas.html` + `resenas.js` | Valoraciones anónimas (una por cliente y producto) |
 | `admin.html` + `admin.js` | Panel del obrador (email y contraseña) |
 | `admin-firebase.js` | Instancia de Firebase **exclusiva del panel**: su sesión nunca se mezcla con la de los clientes |
+| `admin-costs.js` | Monitor de costes: proveedores reales, precio actual frente al anterior, margen por pandebono y lista de la compra |
+| `admin-biometric.js` | Desbloqueo del panel con Face ID / Touch ID / huella (WebAuthn) sobre la sesión guardada en el dispositivo |
+| `ui.js` / `icons.js` / `faq.js` | Interfaz común: diálogos animados, avisos, iconos SVG y preguntas frecuentes |
 | `firebase-config.js` | Configuración pública del proyecto |
 | `firebase.js` / `auth.js` | Instancia de Firebase de los clientes (Firestore / Auth) y conexión a emuladores |
 | `session.js` | Guardia de navegación y sesión del cliente |

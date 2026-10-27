@@ -16,6 +16,8 @@ rules_version = '2';
 //   reviews/{uid_producto}   Públicas y anónimas. Una por cliente y producto, solo con compra entregada.
 //   reviewAuthors/{id}       Privado. Vincula cada reseña con su autor (solo lo ve el obrador).
 //   customers/{teléfono}     Expedientes antiguos (antes de las cuentas de Google): solo el obrador.
+//   ingredients/{id}         Materias primas: proveedor, precio, precio anterior y receta por tanda (solo el obrador).
+//   settings/costs           Tamaño de tanda y otros costes (solo el obrador).
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -90,6 +92,16 @@ service cloud.firestore {
     match /admins/{uid} {
       allow get: if isOwner(uid);
       allow list, write: if false;
+    }
+
+    // ---------- Costes del obrador (privados: precios de proveedores y receta por tanda) ----------
+
+    match /ingredients/{ingredientId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read, write: if isAdmin();
     }
 
     // ---------- Clientes ----------

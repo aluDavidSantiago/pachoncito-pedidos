@@ -8,7 +8,8 @@
     <meta name="theme-color" content="#110e0c" media="(prefers-color-scheme: dark)">
     <link rel="icon" href="icons/favicon-dark-48.png" media="(prefers-color-scheme: dark)">
     <link rel="icon" href="icons/favicon-light-48.png" media="(prefers-color-scheme: light)">
-    <title>Pachoncito | Panel del Obrador</title>
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <title>Pachoncito | Obrador</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="admin-page">
@@ -16,14 +17,16 @@
         <header class="dashboard-header">
             <picture class="brand-picture brand-picture-small"><source srcset="icons/logo-tinta.png" media="(prefers-color-scheme: light)"><img src="icons/logo-blanco.png" alt="Pachoncito" class="brand-logo" width="140" height="34"></picture>
             <div class="dashboard-actions">
-                <span class="badge">👨‍🍳 Panel del Obrador</span>
-                <button type="button" id="logoutBtn" class="btn btn-small" hidden>Cerrar sesión</button>
+                <span class="badge">Obrador</span>
+                <button type="button" id="biometricToggleBtn" class="btn btn-small" hidden></button>
+                <button type="button" id="lockBtn" class="btn btn-small" hidden><span data-icon="lock"></span>Bloquear</button>
+                <button type="button" id="logoutBtn" class="btn btn-small" hidden><span data-icon="logout"></span>Salir</button>
             </div>
         </header>
 
-        <p id="authStatus" class="loading-state">Comprobando sesión… 🥖</p>
+        <p id="authStatus" class="loading-state">Comprobando sesión…</p>
 
-        <!-- Acceso restringido: Firebase Auth (email y contraseña) + documento admins/{uid} -->
+        <!-- Acceso manual: Firebase Auth (email y contraseña) + documento admins/{uid} -->
         <section id="loginView" class="login-card" aria-labelledby="loginTitle" hidden>
             <h2 id="loginTitle">Acceso del obrador</h2>
             <p class="section-desc">Solo personal autorizado.</p>
@@ -38,68 +41,114 @@
                 </div>
                 <p id="loginMessage" class="form-message" role="alert" hidden></p>
                 <button type="submit" class="btn btn-primary">Entrar</button>
+                <p class="hint" id="biometricLoginHint" hidden>
+                    Tras entrar con tu contraseña en este dispositivo podrás desbloquear el panel con Face ID.
+                </p>
             </form>
+        </section>
+
+        <!-- Sesión guardada en el dispositivo + Face ID / Touch ID activado: el panel se abre bloqueado -->
+        <section id="lockView" class="login-card lock-card" aria-labelledby="lockTitle" hidden>
+            <div class="lock-glyph"><span data-icon="faceid"></span></div>
+            <h2 id="lockTitle">Panel bloqueado</h2>
+            <p class="section-desc" id="lockDesc">Desbloquéalo para ver los pedidos.</p>
+            <button type="button" id="biometricLoginBtn" class="btn btn-primary btn-biometric">
+                <span data-icon="faceid"></span><span id="biometricLoginLabel">Entrar con Face ID</span>
+            </button>
+            <p id="lockMessage" class="form-message" role="alert" hidden></p>
+            <button type="button" id="usePasswordBtn" class="btn btn-link">Usar contraseña</button>
         </section>
 
         <main id="dashboard" hidden>
             <p id="adminMessage" class="form-message" role="status" aria-live="polite" hidden></p>
 
-            <!-- Resumen de producción -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <h3>Total Clásicos</h3>
-                    <div class="number" id="totalClasicos">0</div>
+            <!-- Domingo de entrega y resumen de producción -->
+            <section class="dash-section" aria-labelledby="productionTitle">
+                <div class="dash-section-head">
+                    <h2 id="productionTitle" class="section-title">Producción</h2>
+                    <label class="sunday-select">
+                        <span class="visually-hidden">Domingo de entrega</span>
+                        <span data-icon="calendar"></span>
+                        <select id="sundaySelect"></select>
+                    </label>
                 </div>
-                <div class="stat-card">
-                    <h3>Total con Bocadillo</h3>
-                    <div class="number" id="totalBocadillo">0</div>
-                </div>
-                <div class="stat-card">
-                    <h3>Ñapas a Regalar 🎁</h3>
-                    <div class="number" id="totalNapas">0</div>
-                </div>
-                <div class="stat-card">
-                    <h3>Inversión Estimada</h3>
-                    <div class="number" id="totalInversion">0,00 €</div>
-                </div>
-                <div class="stat-card">
-                    <h3>Beneficio Neto 💰</h3>
-                    <div class="number profit" id="totalBeneficio">0,00 €</div>
-                </div>
-            </div>
 
-            <div class="finance-grid">
-                <section class="panel-box">
-                    <h2>🛒 Lista de la Compra</h2>
-                    <div class="ingredients-list" id="listaCompraBox"></div>
-                </section>
-
-                <section class="panel-box">
-                    <h2>⚙️ Costes por Tanda (Modificables)</h2>
-                    <div class="ingredients-list">
-[línea retirada: dato privado del obrador]
-[línea retirada: dato privado del obrador]
-[línea retirada: dato privado del obrador]
-[línea retirada: dato privado del obrador]
-                        <label class="ingredient-item" for="costeOtros">Huevos, Azúcar, Sal, Leche <span class="cost-field"><input type="number" id="costeOtros" class="cost-input" value="0.55" step="0.05" min="0" inputmode="decimal"> €</span></label>
-                        <label class="ingredient-item" for="costeGuayaba">Guayaba / Bocadillo <span class="cost-field"><input type="number" id="costeGuayaba" class="cost-input" value="0.50" step="0.05" min="0" inputmode="decimal"> €</span></label>
-                        <label class="ingredient-item" for="costeExtras">Packaging, Bolsas y Luz <span class="cost-field"><input type="number" id="costeExtras" class="cost-input" value="0.74" step="0.05" min="0" inputmode="decimal"> €</span></label>
+                <div class="kpi-grid">
+                    <div class="kpi-card is-hero">
+                        <span class="kpi-label"><span data-icon="layers"></span>A hornear</span>
+                        <strong class="kpi-value" id="kpiTotal">0</strong>
+                        <span class="kpi-sub" id="kpiBatches">0 tandas</span>
                     </div>
-                </section>
-            </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">Clásicos</span>
+                        <strong class="kpi-value" id="kpiClasicos">0</strong>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">Con bocadillo</span>
+                        <strong class="kpi-value" id="kpiBocadillo">0</strong>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label"><span data-icon="gift"></span>Ñapas</span>
+                        <strong class="kpi-value" id="kpiNapas">0</strong>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">Ingresos</span>
+                        <strong class="kpi-value" id="kpiIngresos">0,00 €</strong>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">Coste estimado</span>
+                        <strong class="kpi-value" id="kpiCoste">0,00 €</strong>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label"><span data-icon="trend"></span>Beneficio</span>
+                        <strong class="kpi-value profit" id="kpiBeneficio">0,00 €</strong>
+                    </div>
+                </div>
+            </section>
 
-            <h2 class="section-title">Pedidos en Tiempo Real</h2>
-            <div id="ordersContainer" class="orders-list">
-                <p class="loading-state">Cargando pedidos del obrador… 🥖</p>
-            </div>
+            <!-- Pedidos: pestañas por estado + buscador -->
+            <section class="dash-section" aria-labelledby="ordersTitle">
+                <h2 id="ordersTitle" class="section-title">Encargos</h2>
+                <div class="orders-toolbar">
+                    <div class="segmented" role="tablist" aria-label="Filtrar por estado" id="statusTabs">
+                        <span class="segmented-indicator" aria-hidden="true"></span>
+                        <button type="button" role="tab" data-tab="pendientes" aria-selected="true">Pendientes <span class="tab-count" data-count="pendientes">0</span></button>
+                        <button type="button" role="tab" data-tab="listos" aria-selected="false">Listos <span class="tab-count" data-count="listos">0</span></button>
+                        <button type="button" role="tab" data-tab="completados" aria-selected="false">Entregados <span class="tab-count" data-count="completados">0</span></button>
+                        <button type="button" role="tab" data-tab="cancelados" aria-selected="false">Cancelados <span class="tab-count" data-count="cancelados">0</span></button>
+                    </div>
+                    <label class="search-field">
+                        <span data-icon="search"></span>
+                        <input type="search" id="orderSearch" placeholder="Buscar por nombre o teléfono" autocomplete="off" enterkeyhint="search">
+                    </label>
+                </div>
+                <div id="ordersContainer" class="orders-list" role="tabpanel">
+                    <p class="loading-state">Cargando encargos…</p>
+                </div>
+            </section>
 
-            <h2 class="section-title">Reseñas de Clientes</h2>
-            <div id="reviewsContainer" class="orders-list">
-                <p class="loading-state">Cargando reseñas…</p>
-            </div>
+            <!-- Monitor de costes con los proveedores reales -->
+            <section class="dash-section" aria-labelledby="costsTitle">
+                <div class="dash-section-head">
+                    <h2 id="costsTitle" class="section-title">Materias primas y costes</h2>
+                </div>
+                <div id="costMonitor"><p class="loading-state">Cargando costes…</p></div>
+            </section>
+
+            <section class="dash-section panel-box" aria-labelledby="shoppingTitle">
+                <h2 id="shoppingTitle"><span data-icon="cart"></span> Lista de la compra del domingo</h2>
+                <div class="ingredients-list" id="listaCompraBox"></div>
+            </section>
+
+            <section class="dash-section" aria-labelledby="reviewsTitle">
+                <h2 id="reviewsTitle" class="section-title">Reseñas de clientes</h2>
+                <div id="reviewsContainer" class="orders-list">
+                    <p class="loading-state">Cargando reseñas…</p>
+                </div>
+            </section>
 
             <details class="panel-box admin-tools">
-                <summary>📱 Teléfonos vinculados</summary>
+                <summary>Teléfonos vinculados</summary>
                 <div class="form-section">
                     <p class="section-desc">
                         Cada teléfono solo puede estar vinculado a una cuenta. Si un cliente dice que su número lo tiene
@@ -111,14 +160,14 @@
                         <input type="tel" id="releasePhone" inputmode="tel" placeholder="600 000 000">
                     </div>
                     <div class="actions-bar">
-                        <button type="button" id="releasePhoneBtn" class="btn btn-small btn-danger">🔓 Liberar teléfono</button>
+                        <button type="button" id="releasePhoneBtn" class="btn btn-small btn-danger">Liberar teléfono</button>
                     </div>
                     <p id="releaseMessage" class="form-message" role="status" aria-live="polite" hidden></p>
                 </div>
             </details>
 
             <details class="panel-box test-tools">
-                <summary>🧪 Datos de prueba</summary>
+                <summary>Datos de prueba</summary>
                 <div class="form-section">
                     <p class="section-desc">
                         Genera un escenario completo en <strong id="testTarget"></strong>: pedidos en todos los estados,
@@ -133,14 +182,27 @@
                         (<span id="testPhones"></span>). «Borrar datos de prueba» elimina también esas cuentas.
                     </p>
                     <div class="actions-bar">
-                        <button type="button" id="seedBtn" class="btn btn-small">🧪 Generar / regenerar datos de prueba</button>
-                        <button type="button" id="clearSeedBtn" class="btn btn-small btn-danger">🧹 Borrar datos de prueba</button>
+                        <button type="button" id="seedBtn" class="btn btn-small">Generar / regenerar datos de prueba</button>
+                        <button type="button" id="clearSeedBtn" class="btn btn-small btn-danger">Borrar datos de prueba</button>
                     </div>
                     <p id="seedMessage" class="form-message" role="status" aria-live="polite" hidden></p>
                 </div>
             </details>
         </main>
     </div>
+
+    <!-- Oferta de Face ID tras el primer acceso con contraseña (estilo alerta de iOS) -->
+    <dialog id="biometricOffer" class="modal ios-alert" aria-labelledby="biometricOfferTitle">
+        <div class="ios-alert-body">
+            <div class="lock-glyph"><span data-icon="faceid"></span></div>
+            <h3 id="biometricOfferTitle" tabindex="-1" autofocus>¿Activar Face ID?</h3>
+            <p class="section-desc" id="biometricOfferText">Accede más rápido al panel: tu sesión se quedará en este dispositivo y se desbloqueará con Face ID.</p>
+        </div>
+        <div class="ios-alert-actions">
+            <button type="button" id="biometricOfferNo" class="ios-alert-btn">Ahora no</button>
+            <button type="button" id="biometricOfferYes" class="ios-alert-btn is-default">Activar</button>
+        </div>
+    </dialog>
 
     <script type="module" src="admin.js"></script>
 </body>
