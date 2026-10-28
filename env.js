@@ -51,8 +51,13 @@ export function mountEnvBanner() {
     if (!TEST_MODE) return;
     const target = USE_EMULATORS ? 'emuladores locales' : 'Firebase real';
     document.body.classList.add('has-env-banner');
-    document.body.prepend(el('div', { className: 'env-banner', role: 'note' },
+    const banner = el('div', { className: 'env-banner', role: 'note' },
         el('strong', { text: `🧪 Modo pruebas · ${target}` }),
         ` · Entra como cliente de prueba y usa teléfonos ${TEST_PHONES_LABEL}`
-    ));
+    );
+    document.body.prepend(banner);
+    // Altura real del aviso (cambia con el ancho): la barra superior fija se coloca justo debajo
+    const sync = () => document.documentElement.style.setProperty('--env-banner-h', `${banner.offsetHeight}px`);
+    sync();
+    new ResizeObserver(sync).observe(banner);
 }

@@ -19,6 +19,18 @@
 </head>
 <body>
     <div class="container">
+        <!-- Barra superior fija: cuenta a la izquierda, pedido a la derecha (ui.js · mountTopNav) -->
+        <nav class="top-nav" aria-label="Navegación principal">
+            <a href="cuenta.html" class="nav-account" aria-label="Mi cuenta y ñapas acumuladas">
+                <span class="nav-avatar"><span data-icon="user"></span></span>
+                <span class="nav-account-text">
+                    <span class="nav-name" data-nav-name>Mi cuenta</span>
+                    <span class="nav-napas"><span data-icon="gift"></span><strong data-nav-napas>0</strong> ñapas</span>
+                </span>
+            </a>
+            <a href="index.html#pedido" class="nav-cta" data-nav-order><span data-icon="bread"></span>Hacer pedido</a>
+        </nav>
+
         <header class="site-header">
             <div class="logo-container">
                 <a href="index.html"><picture class="brand-picture"><source srcset="icons/logo-tinta.png" media="(prefers-color-scheme: light)"><img src="icons/logo-blanco.png" alt="Pachoncito — volver a pedidos" class="brand-logo" width="300" height="73"></picture></a>
@@ -85,10 +97,6 @@
         </main>
 
         <footer class="site-footer">
-            <nav class="footer-links" aria-label="Más opciones">
-                <a href="index.html" class="btn btn-secondary"><span data-icon="bread"></span>Hacer pedido</a>
-                <a href="cuenta.html" class="btn btn-secondary"><span data-icon="user"></span>Mi cuenta</a>
-            </nav>
             <button type="button" class="btn btn-secondary" data-open-faq><span data-icon="question"></span>Preguntas frecuentes</button>
         </footer>
     </div>

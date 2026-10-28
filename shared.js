@@ -47,6 +47,37 @@ export function normalizePhone(raw) {
     return /^\+\d{8,15}$/.test(phone) ? phone : null;
 }
 
+// Validación estructural de un móvil español, sin SMS: 9 cifras, prefijo móvil real (6 o 71–74) y sin
+// patrones de número inventado. Las reglas de Firestore repiten el formato y los patrones (isRealMobile).
+// Devuelve { phone: '+34…' } si es válido, o { error, incomplete } con el motivo para mostrarlo al momento.
+const SEQUENCES = ['0123456789', '9876543210'];
+
+export function phoneDigits(raw) {
+    let digits = String(raw || '').replace(/\D/g, '');
+    if (digits.length > 9 && digits.startsWith('0034')) digits = digits.slice(4);
+    else if (digits.length > 9 && digits.startsWith('34')) digits = digits.slice(2);
+    return digits;
+}
+
+export function validateMobile(raw) {
+    const digits = phoneDigits(raw);
+    if (!digits) return { error: 'Escribe tu móvil.', incomplete: true };
+    if (!/^[67]/.test(digits)) return { error: 'Debe ser un móvil español: empieza por 6 o 7.' };
+    if (digits.length < 9) return { error: `Faltan ${9 - digits.length} ${9 - digits.length === 1 ? 'cifra' : 'cifras'}.`, incomplete: true };
+    if (digits.length > 9) return { error: 'Tiene más de 9 cifras.' };
+    if (/^7[05-9]/.test(digits)) return { error: 'Los móviles que empiezan por 7 van del 71 al 74.' };
+    if (/(\d)\1{4}/.test(digits)) return { error: 'Tiene demasiadas cifras iguales seguidas.' };
+    if (new Set(digits).size < 3) return { error: 'No parece un número real: revisa las cifras.' };
+    for (let i = 0; i + 6 <= digits.length; i++) {
+        const chunk = digits.slice(i, i + 6);
+        if (SEQUENCES.some(seq => seq.includes(chunk))) return { error: 'Contiene una secuencia (123456…): revisa el número.' };
+    }
+    return { phone: `+34${digits}` };
+}
+
+// «612345678» → «612 345 678» (máscara de entrada)
+export const formatMobile = digits => digits.slice(0, 9).replace(/^(\d{3})(\d{1,3})?(\d{1,3})?$/, (_, a, b, c) => [a, b, c].filter(Boolean).join(' '));
+
 // Crea elementos del DOM de forma segura: todo el texto entra como textContent, nunca como HTML.
 export function el(tag, props = {}, ...children) {
     const node = document.createElement(tag);

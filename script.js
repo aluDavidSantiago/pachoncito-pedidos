@@ -6,7 +6,7 @@ import { hydrateIcons } from "./icons.js";
 import { buildOrder, normalizeOrder, priceOrder } from "./orders.js";
 import { mountInstallPrompt, registerServiceWorker } from "./pwa.js";
 import { requireCustomer } from "./session.js";
-import { bump, initUI } from "./ui.js";
+import { bump, initUI, mountTopNav } from "./ui.js";
 import { el, formatEUR, MAX_QTY, NAPA_EVERY_CENTS, PRICES_CENTS, showMessage, storage } from "./shared.js";
 
 mountEnvBanner();
@@ -28,8 +28,7 @@ const OPEN_STATUSES = ['pending', 'preparing', 'ready'];
 let napasAvailable = 0;
 let napasToRedeem = 0;
 
-$('accountName').textContent = profile.name.split(' ')[0];
-$('napaBalance').textContent = profile.napaCredits || 0;
+mountTopNav(profile);
 mountInstallPrompt($('installSlot'));
 
 // Precios visibles desde la misma fuente que usa el cálculo

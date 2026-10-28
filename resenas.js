@@ -8,7 +8,7 @@ import { hydrateIcons } from "./icons.js";
 import { registerServiceWorker } from "./pwa.js";
 import { requireCustomer } from "./session.js";
 import { el, formatDate, PRODUCT_NAMES, RATING_ASPECTS, showMessage, starsText, withBusy } from "./shared.js";
-import { initUI } from "./ui.js";
+import { initUI, mountTopNav } from "./ui.js";
 
 mountEnvBanner();
 registerServiceWorker();
@@ -16,7 +16,8 @@ hydrateIcons();
 mountFaq();
 initUI();
 
-const { session } = await requireCustomer();
+const { session, profile } = await requireCustomer();
+mountTopNav(profile);
 
 const $ = id => document.getElementById(id);
 const form = $('ratingForm');

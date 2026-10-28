@@ -8,7 +8,7 @@ import { normalizeOrder } from "./orders.js";
 import { mountInstallPrompt, registerServiceWorker } from "./pwa.js";
 import { endSession, requireCustomer } from "./session.js";
 import { el, formatDate, formatEUR, PRODUCT_NAMES, showMessage } from "./shared.js";
-import { initUI } from "./ui.js";
+import { initUI, mountTopNav } from "./ui.js";
 
 mountEnvBanner();
 registerServiceWorker();
@@ -17,6 +17,7 @@ mountFaq();
 initUI();
 
 const { session, profile } = await requireCustomer();
+mountTopNav(profile);
 const $ = id => document.getElementById(id);
 
 const STATUS = {

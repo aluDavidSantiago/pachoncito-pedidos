@@ -68,6 +68,12 @@ Plataforma web desarrollada para la gestión, procesamiento y control de pedidos
 
 ## Antifraude: un teléfono, una cuenta
 
+**Validación del móvil sin SMS** (`validateMobile()` en `shared.js`, repetida en `isRealMobile()` de `firestore.rules`):
+9 cifras, prefijo móvil español (6 o 71–74), sin 5 cifras iguales seguidas ni secuencias de 6 (123456 / 654321),
+con máscara «612 345 678», aviso en tiempo real y un segundo campo de confirmación que no admite pegar.
+Las cuentas anónimas del modo pruebas siguen usando los teléfonos ficticios; las cuentas de Google del emulador
+necesitan un móvil con formato real.
+
 Al darse de alta, el cliente vincula su teléfono/WhatsApp. Firestore guarda un cerrojo `phoneClaims/{teléfono}`
 que solo se puede crear una vez: si otra cuenta de Gmail intenta usar el mismo número, el alta se rechaza.
 El teléfono no se puede cambiar desde la web.

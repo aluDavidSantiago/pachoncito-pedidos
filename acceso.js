@@ -13,7 +13,7 @@ import { db } from "./firebase.js";
 import { hydrateIcons } from "./icons.js";
 import { isStandalone, mountInstallPrompt, registerServiceWorker } from "./pwa.js";
 import { endSession, getProfile, getSession, hasCompletedProfile, safeNext } from "./session.js";
-import { normalizePhone, showMessage, storage, withBusy } from "./shared.js";
+import { formatMobile, normalizePhone, phoneDigits, showMessage, storage, validateMobile, withBusy } from "./shared.js";
 import { closeDialog, initUI } from "./ui.js";
 
 mountEnvBanner();
@@ -171,7 +171,10 @@ function showProfileStep() {
     $('regAddress').value = saved.address || '';
     const storedInvite = String(storage.get('pachoncito_ref') || '');
     $('regInvite').value = REFERRAL_CODE.test(storedInvite) ? storedInvite : ''; // los enlaces antiguos llevaban un teléfono
-    if (session.isTest) $('regPhone').placeholder = '600 000 123 (teléfono de prueba)';
+    if (session.isTest) {
+        $('regPhone').placeholder = '600 000 123 (teléfono de prueba)';
+        $('regPhoneConfirm').placeholder = '600 000 123';
+    }
 
     showStep('stepProfile');
     $(relinking ? 'regPhone' : 'regName').focus();
@@ -196,16 +199,59 @@ async function freeReferralCode(name) {
     throw new Error('No se pudo generar un código de invitación libre');
 }
 
-function validatePhone() {
-    const phone = normalizePhone($('regPhone').value);
-    if (!phone) {
-        showMessage(message, 'Introduce un teléfono válido (9 cifras o formato +34…).', 'error');
-        $('regPhone').focus();
-        return null;
+// Comprueba el móvil sin SMS: formato y patrones (validateMobile) y que ambos campos coincidan.
+// Las cuentas de prueba usan los teléfonos ficticios de env.js, que a propósito no pasarían los patrones.
+function checkPhone(raw) {
+    if (session?.isTest) {
+        const phone = normalizePhone(raw);
+        return phone && isTestPhone(phone) ? { phone } : { error: `Usa un teléfono de prueba: ${TEST_PHONES_LABEL}.` };
     }
-    if (session.isTest && !isTestPhone(phone)) {
-        showMessage(message, `En la cuenta de prueba usa un teléfono de prueba: ${TEST_PHONES_LABEL}.`, 'error');
-        $('regPhone').focus();
+    return validateMobile(raw);
+}
+
+function setFieldState(field, status, state, text) {
+    field.classList.toggle('is-valid', state === 'valid');
+    field.classList.toggle('is-invalid', state === 'invalid');
+    status.textContent = text || '';
+}
+
+// Estado visual de los dos campos. strict = al enviar (también marca los campos incompletos)
+function renderPhoneState(strict = false) {
+    const main = checkPhone($('regPhone').value);
+    const typed = phoneDigits($('regPhone').value).length > 0;
+    if (main.phone) setFieldState($('phoneField'), $('phoneStatus'), 'valid', '✓ Número válido');
+    else if (typed && (strict || !main.incomplete)) setFieldState($('phoneField'), $('phoneStatus'), 'invalid', main.error);
+    else setFieldState($('phoneField'), $('phoneStatus'), strict ? 'invalid' : null, strict ? main.error : '');
+
+    const confirmDigits = phoneDigits($('regPhoneConfirm').value);
+    const mainDigits = phoneDigits($('regPhone').value);
+    const matches = confirmDigits.length > 0 && confirmDigits === mainDigits;
+    if (matches && main.phone) setFieldState($('phoneConfirmField'), $('phoneConfirmStatus'), 'valid', '✓ Coinciden');
+    else if ((confirmDigits.length > 0 && confirmDigits.length >= mainDigits.length) || (strict && !matches)) {
+        setFieldState($('phoneConfirmField'), $('phoneConfirmStatus'), 'invalid', confirmDigits ? 'Los dos números no coinciden.' : 'Repite el número para confirmarlo.');
+    } else setFieldState($('phoneConfirmField'), $('phoneConfirmStatus'), null, '');
+    return main.phone && matches ? main.phone : null;
+}
+
+// Máscara «612 345 678»: solo se reformatea al escribir al final, para no mover el cursor al corregir en medio
+function maskPhoneInput(event) {
+    const input = event.target;
+    if (!session?.isTest && input.selectionStart === input.value.length) {
+        const digits = phoneDigits(input.value);
+        if (digits.length <= 9) input.value = formatMobile(digits);
+    }
+    renderPhoneState();
+}
+
+$('regPhone').addEventListener('input', maskPhoneInput);
+$('regPhoneConfirm').addEventListener('input', maskPhoneInput);
+$('regPhoneConfirm').addEventListener('paste', event => event.preventDefault()); // la confirmación se teclea
+
+function validatePhone() {
+    const phone = renderPhoneState(true);
+    if (!phone) {
+        showMessage(message, 'Revisa tu móvil: debe ser un número español válido y coincidir en los dos campos.', 'error');
+        $(document.querySelector('#phoneField.is-invalid') ? 'regPhone' : 'regPhoneConfirm').focus();
         return null;
     }
     return phone;

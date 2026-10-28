@@ -19,16 +19,23 @@
 </head>
 <body>
     <div class="container">
+        <!-- Barra superior fija: cuenta a la izquierda, pedido a la derecha (ui.js · mountTopNav) -->
+        <nav class="top-nav" aria-label="Navegación principal">
+            <a href="cuenta.html" class="nav-account" aria-label="Mi cuenta y ñapas acumuladas">
+                <span class="nav-avatar"><span data-icon="user"></span></span>
+                <span class="nav-account-text">
+                    <span class="nav-name" data-nav-name>Mi cuenta</span>
+                    <span class="nav-napas"><span data-icon="gift"></span><strong data-nav-napas>0</strong> ñapas</span>
+                </span>
+            </a>
+            <a href="#pedido" class="nav-cta" data-nav-order aria-current="page"><span data-icon="bread"></span>Hacer pedido</a>
+        </nav>
+
         <header class="site-header">
             <div class="logo-container">
                 <picture class="brand-picture"><source srcset="icons/logo-tinta.png" media="(prefers-color-scheme: light)"><img src="icons/logo-blanco.png" alt="Pachoncito" class="brand-logo" width="300" height="73"></picture>
             </div>
             <div class="badge">Reservas de lunes a viernes · Entregas los domingos</div>
-            <a href="cuenta.html" class="account-chip" id="accountChip" aria-label="Mi cuenta y ñapas acumuladas">
-                <span data-icon="user"></span><span id="accountName">Mi cuenta</span>
-                <span class="chip-divider" aria-hidden="true"></span>
-                <span data-icon="gift"></span><strong id="napaBalance">0</strong>
-            </a>
         </header>
 
         <div id="installSlot"></div>
@@ -44,7 +51,7 @@
                 <input type="tel" id="telefono" readonly aria-readonly="true">
             </div>
 
-            <div class="products-section">
+            <div class="products-section" id="pedido">
                 <div class="product-card" data-card="clasico">
                     <div class="product-main">
                         <!-- Para poner la foto: <img src="img/clasico.jpg" alt="" width="112" height="112"> en lugar del icono -->
@@ -169,7 +176,6 @@
         <footer class="site-footer">
             <nav class="footer-links" aria-label="Más opciones">
                 <a href="resenas.html" class="btn btn-secondary"><span data-icon="star"></span>Reseñas</a>
-                <a href="cuenta.html" class="btn btn-secondary"><span data-icon="user"></span>Mi cuenta</a>
             </nav>
             <button type="button" class="btn btn-secondary" data-open-faq><span data-icon="question"></span>Preguntas frecuentes</button>
             <a href="https://www.instagram.com/pachoncito_oficial" target="_blank" rel="noopener noreferrer" class="instagram-link">

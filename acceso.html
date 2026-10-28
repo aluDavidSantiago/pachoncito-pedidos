@@ -77,10 +77,17 @@
                     <label for="regName">Nombre y apellidos</label>
                     <input type="text" id="regName" autocomplete="name" maxlength="80" placeholder="Tu nombre completo">
                 </div>
-                <div class="field">
-                    <label for="regPhone">Teléfono / WhatsApp</label>
-                    <input type="tel" id="regPhone" inputmode="tel" autocomplete="tel" placeholder="600 000 000">
-                    <p class="hint">Solo se puede vincular a una cuenta y no se puede cambiar después. Lo confirmamos contigo en la primera entrega.</p>
+                <!-- Validación estructural en tiempo real (shared.js · validateMobile) + doble confirmación -->
+                <div class="field" id="phoneField">
+                    <label for="regPhone">Móvil / WhatsApp</label>
+                    <input type="tel" id="regPhone" class="phone-input" inputmode="numeric" autocomplete="tel-national" maxlength="15" placeholder="6XX XXX XXX" aria-describedby="phoneStatus phoneHint">
+                    <p class="field-status" id="phoneStatus" aria-live="polite"></p>
+                    <p class="hint" id="phoneHint">Móvil español de 9 cifras. Solo se puede vincular a una cuenta y no se puede cambiar después.</p>
+                </div>
+                <div class="field" id="phoneConfirmField">
+                    <label for="regPhoneConfirm">Repite tu móvil</label>
+                    <input type="tel" id="regPhoneConfirm" class="phone-input" inputmode="numeric" autocomplete="off" maxlength="15" placeholder="6XX XXX XXX" aria-describedby="phoneConfirmStatus">
+                    <p class="field-status" id="phoneConfirmStatus" aria-live="polite"></p>
                 </div>
                 <div class="field" data-signup-only>
                     <label for="regAddress">Dirección de entrega <span class="optional">(opcional)</span></label>

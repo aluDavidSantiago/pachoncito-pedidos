@@ -72,14 +72,29 @@ export function initUI() {
     blockZoom();
 }
 
-// Sin zoom: iOS Safari ignora user-scalable=no, así que se bloquean también el pellizco (gesture*),
-// el pellizco con varios dedos y el doble toque (touch-action en style.css); en escritorio, Ctrl + rueda y Ctrl +/−
+// Sin zoom: iOS Safari ignora user-scalable=no, así que se bloquea el pellizco (gesture*) y el doble toque
+// (touch-action en style.css); en escritorio, Ctrl + rueda y Ctrl +/−. Sin escuchar touchmove: así el
+// desplazamiento sigue en el hilo del compositor y no espera al JavaScript.
 function blockZoom() {
     const prevent = event => event.preventDefault();
     ['gesturestart', 'gesturechange', 'gestureend'].forEach(type => document.addEventListener(type, prevent, { passive: false }));
-    document.addEventListener('touchmove', event => { if (event.touches.length > 1) event.preventDefault(); }, { passive: false });
     document.addEventListener('wheel', event => { if (event.ctrlKey) event.preventDefault(); }, { passive: false });
     document.addEventListener('keydown', event => {
         if ((event.ctrlKey || event.metaKey) && ['+', '-', '=', '0'].includes(event.key)) event.preventDefault();
+    });
+}
+
+// Barra superior: nombre y ñapas del cliente. En la página de pedido, «Hacer pedido» desplaza a los productos.
+export function mountTopNav(profile) {
+    document.querySelectorAll('[data-nav-name]').forEach(node => { node.textContent = profile.name.split(' ')[0]; });
+    document.querySelectorAll('[data-nav-napas]').forEach(node => { node.textContent = profile.napaCredits || 0; });
+    const target = document.getElementById('pedido');
+    const cta = document.querySelector('[data-nav-order]');
+    if (!target || !cta) return;
+    cta.addEventListener('click', event => {
+        event.preventDefault();
+        const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+        target.querySelector('button')?.focus({ preventScroll: true });
     });
 }

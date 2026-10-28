@@ -75,9 +75,18 @@ service cloud.firestore {
       return /databases/$(database)/documents/referralCodes/$(code);
     }
 
-    // Los clientes de prueba (anónimos) solo pueden vincular teléfonos de prueba
+    // Móvil español real (repite validateMobile() de shared.js): 6xx o 71x–74x, sin 5 cifras iguales
+    // seguidas ni secuencias de 6 (123456 / 654321). Los demás campos con teléfono siguen usando isPhone().
+    function isRealMobile(phone) {
+      return isPhone(phone)
+        && phone.matches('^[+]34(6[0-9]|7[1-4])[0-9]{7}$')
+        && !phone.matches('.*(00000|11111|22222|33333|44444|55555|66666|77777|88888|99999).*')
+        && !phone.matches('.*(012345|123456|234567|345678|456789|987654|876543|765432|654321|543210).*');
+    }
+
+    // Al vincular un teléfono: los clientes de prueba (anónimos) solo teléfonos de prueba; el resto, móviles reales
     function allowedPhone(phone) {
-      return isPhone(phone) && (!isAnonymous() || isTestPhone(phone));
+      return isAnonymous() ? isTestPhone(phone) : isRealMobile(phone);
     }
 
     function validName(name) {
