@@ -485,6 +485,17 @@ h2 {
     width: min(100%, 18.75rem);
 }
 
+/* En Mi cuenta y Valoraciones el logo va dentro de un enlace: el enlace toma el ancho del logo para que
+   el ancho en % de la imagen tenga referencia y la caja quede centrada en el contenedor flex */
+.logo-container > a {
+    display: block;
+    width: min(100%, 18.75rem);
+}
+
+.logo-container > a > .brand-picture {
+    width: 100%;
+}
+
 .brand-picture-small {
     width: 8.75rem;
 }
@@ -1753,9 +1764,12 @@ details[open] > .faq-body {
     font-variant-numeric: tabular-nums;
 }
 
-/* ---------- Mi cuenta y Valoraciones: composición centrada y simétrica ---------- */
+/* ---------- Mi cuenta y Valoraciones ----------
+   Lectura natural a la izquierda (como el formulario de pedido): pedidos, reseñas, avisos y formulario.
+   Al centro solo lo que pide simetría: títulos de sección, contadores, código de invitación, medias y acciones. */
 
-.page-centered {
+.page-centered .page-section > h2,
+.page-centered .referral-code {
     text-align: center;
 }
 
@@ -1791,72 +1805,23 @@ details[open] > .faq-body {
     text-wrap: balance;
 }
 
-/* Los párrafos conservan la lectura natural (alineados al inicio); títulos, cifras y controles van al centro */
-.page-centered .section-desc,
-.page-centered .hint,
-.page-centered .review-comment {
-    text-align: start;
-}
-
-.page-centered .hint {
-    margin-bottom: 0.25rem;
-}
-
 .page-centered .stats-grid + .hint {
     margin-bottom: 0;
 }
 
-.page-centered .review-card {
-    text-align: center;
-    padding: 1rem;
-}
-
-.page-centered .review-meta {
-    flex-direction: column;
-    justify-content: center;
-}
-
-.page-centered .review-scores,
-.page-centered .signed-in {
-    justify-content: center;
-}
-
+/* Medias de valoración: bloque compacto centrado (sus filas se leen de izquierda a derecha) */
 .page-centered .rating-summary {
     align-items: center;
+}
+
+.page-centered .rating-summary .hint {
+    text-align: center;
 }
 
 .page-centered .summary-row {
     width: min(100%, 20rem);
     grid-template-columns: 5.5rem auto 2.5em;
     justify-content: center;
-    text-align: left;
-}
-
-.page-centered .rating {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.page-centered .rating legend {
-    margin-inline: auto;
-}
-
-.page-centered .choice-cards legend,
-.page-centered .field label {
-    text-align: center;
-    width: 100%;
-}
-
-.page-centered .alert-box.is-reward {
-    text-align: center;
-}
-
-.page-centered .btn-link {
-    align-self: center;
-    justify-content: center;
-    margin-inline: auto;
-    text-align: center;
 }
 
 .page-centered .page-section > .btn-link {
