@@ -5,6 +5,7 @@ import { db } from "./firebase.js";
 import { hydrateIcons } from "./icons.js";
 import { buildOrder, normalizeOrder, priceOrder } from "./orders.js";
 import { mountInstallPrompt, registerServiceWorker } from "./pwa.js";
+import { playReward, playSuccess, playTap } from "./sound.js";
 import { requireCustomer } from "./session.js";
 import { bump, initUI, mountTopNav } from "./ui.js";
 import { el, formatEUR, MAX_QTY, NAPA_EVERY_CENTS, PRICES_CENTS, showMessage, storage } from "./shared.js";
@@ -23,6 +24,7 @@ const form = $('orderForm');
 const submitBtn = $('submitBtn');
 const message = $('formMessage');
 const SUBMIT_LABEL = submitBtn.textContent;
+let lastNapaCount = 0;
 const quantities = { clasico: 0, bocadillo: 0 };
 const OPEN_STATUSES = ['pending', 'preparing', 'ready'];
 let napasAvailable = 0;
@@ -86,6 +88,10 @@ function updateSummary() {
     if ($('totalPrice').textContent !== total) bump($('totalPrice'));
     $('totalPrice').textContent = total;
 
+    // Suena solo al ganar una ñapa más, no al perderla ni al repintar
+    if (napaCount > lastNapaCount) playReward();
+    lastNapaCount = napaCount;
+
     const alertBox = $('napaAlert');
     alertBox.classList.toggle('is-success', napaCount > 0);
     if (napaCount > 0) {
@@ -111,7 +117,9 @@ form.addEventListener('click', event => {
     const button = event.target.closest('[data-product]');
     if (!button) return;
     const product = button.dataset.product;
-    setQty(product, quantities[product] + Number(button.dataset.delta));
+    const before = quantities[product];
+    setQty(product, before + Number(button.dataset.delta));
+    if (quantities[product] > before) playTap();
     updateSummary();
 });
 
@@ -180,6 +188,7 @@ form.addEventListener('submit', async event => {
         prefill();
         toggleDireccion();
 
+        playSuccess();
         showMessage(message, `Pedido reservado, ${nombre.split(' ')[0]}. Te esperamos el domingo; puedes seguirlo en «Mi cuenta».`, 'success');
         message.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } catch (error) {

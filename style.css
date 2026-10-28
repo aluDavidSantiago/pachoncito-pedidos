@@ -430,6 +430,38 @@ h2 {
 
 .nav-cta .icon { width: 1.125rem; height: 1.125rem; }
 
+.nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+/* Sonido: botón redondo muy discreto (área táctil de 44 px, icono pequeño) */
+.nav-sound {
+    display: grid;
+    place-items: center;
+    width: var(--tap);
+    height: var(--tap);
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-muted);
+    opacity: 0.7;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform var(--dur-3) var(--ease-spring), opacity var(--dur-2) var(--ease-out);
+}
+
+.nav-sound .icon { width: 1.125rem; height: 1.125rem; }
+.nav-sound[aria-pressed="false"] { opacity: 0.45; }
+.nav-sound:active { transform: scale(0.88); transition-duration: var(--dur-1); transition-timing-function: var(--ease-press); }
+
+@media (hover: hover) and (pointer: fine) {
+    .nav-sound:hover { opacity: 1; }
+}
+
 /* Página actual: la cuenta se marca con borde terracota */
 .nav-account[aria-current="page"] {
     border-color: var(--terracotta-border);
@@ -465,6 +497,9 @@ h2 {
 @media (max-width: 360px) {
     .nav-name { max-width: 5.5rem; }
     .nav-cta { padding-inline: 0.8rem; }
+    .nav-napas-word { display: none; }
+    .nav-actions { gap: 0.25rem; }
+    .nav-sound { width: 2.5rem; }
 }
 
 /* ---------- Cabecera ---------- */

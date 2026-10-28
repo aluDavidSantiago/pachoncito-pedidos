@@ -1,6 +1,8 @@
 // Comportamiento de interfaz común: respuesta táctil, salida animada de los diálogos y latidos de valores.
 // Solo toca clases y eventos de la interfaz; no interviene en Firebase ni en los flujos de pedido.
+import { icon } from "./icons.js";
 import { APP_VERSION, el } from "./shared.js";
+import { isSoundEnabled, playTap, setSoundEnabled } from "./sound.js";
 
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -96,6 +98,7 @@ function blockZoom() {
 export function mountTopNav(profile) {
     document.querySelectorAll('[data-nav-name]').forEach(node => { node.textContent = profile.name.split(' ')[0]; });
     document.querySelectorAll('[data-nav-napas]').forEach(node => { node.textContent = profile.napaCredits || 0; });
+    mountSoundToggle();
     const target = document.getElementById('pedido');
     const cta = document.querySelector('[data-nav-order]');
     if (!target || !cta) return;
@@ -105,4 +108,22 @@ export function mountTopNav(profile) {
         target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
         target.querySelector('button')?.focus({ preventScroll: true });
     });
+}
+
+// Silencio / sonido en la barra superior; la preferencia se recuerda en este dispositivo (sound.js)
+function mountSoundToggle() {
+    const button = document.querySelector('[data-sound-toggle]');
+    if (!button) return;
+    const render = () => {
+        const on = isSoundEnabled();
+        button.setAttribute('aria-pressed', String(on));
+        button.title = on ? 'Sonido activado' : 'Sonido silenciado';
+        button.replaceChildren(icon(on ? 'soundOn' : 'soundOff'));
+    };
+    button.addEventListener('click', () => {
+        setSoundEnabled(!isSoundEnabled());
+        render();
+        playTap(); // confirma que vuelve a sonar (si se ha silenciado, no suena)
+    });
+    render();
 }
