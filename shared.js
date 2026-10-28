@@ -1,6 +1,9 @@
 // Reglas de negocio y utilidades compartidas.
 // IMPORTANTE: los precios y la regla de ñapas también están en firestore.rules; si cambian aquí, cámbialos allí.
 
+// Versión visible en el pie de todas las páginas (ui.js · mountVersion). Al cambiarla, sube también CACHE_VERSION en sw.js.
+export const APP_VERSION = '2.3.0';
+
 export const PRICES_CENTS = { clasico: 150, bocadillo: 170 };
 export const DELIVERY_CENTS = 100;
 export const NAPA_EVERY_CENTS = 1000; // 1 ñapa por cada 10 € (envío incluido)

@@ -2860,6 +2860,24 @@ details[open] > .faq-body {
     .sunday-select, .sunday-select select { width: 100%; min-width: 0; }
 }
 
+/* ---------- Indicador de versión (pie, casi imperceptible) ---------- */
+
+.app-version {
+    margin-top: 1.25rem;
+    text-align: center;
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    opacity: 0.45;
+    font-variant-numeric: tabular-nums;
+    user-select: none;
+    pointer-events: none;
+}
+
+.admin-page > .app-version {
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+
 /* ---------- Modo pruebas ---------- */
 
 .env-banner {

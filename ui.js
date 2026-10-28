@@ -1,5 +1,6 @@
 // Comportamiento de interfaz común: respuesta táctil, salida animada de los diálogos y latidos de valores.
 // Solo toca clases y eventos de la interfaz; no interviene en Firebase ni en los flujos de pedido.
+import { APP_VERSION, el } from "./shared.js";
 
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -70,6 +71,13 @@ export function initUI() {
     document.addEventListener('touchstart', () => {}, { passive: true });
     document.querySelectorAll('dialog').forEach(enhanceDialog);
     blockZoom();
+    mountVersion();
+}
+
+// Indicador de versión: texto informativo al final de la tarjeta (o del panel), sin enlaces
+function mountVersion() {
+    const host = document.querySelector('.container') || document.body;
+    host.append(el('p', { className: 'app-version', text: `Pachoncito v${APP_VERSION}` }));
 }
 
 // Sin zoom: iOS Safari ignora user-scalable=no, así que se bloquea el pellizco (gesture*) y el doble toque
