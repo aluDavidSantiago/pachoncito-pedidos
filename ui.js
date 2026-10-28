@@ -69,4 +69,17 @@ export function initUI() {
     // iOS Safari solo aplica :active (la respuesta al tocar) si la página escucha toques
     document.addEventListener('touchstart', () => {}, { passive: true });
     document.querySelectorAll('dialog').forEach(enhanceDialog);
+    blockZoom();
+}
+
+// Sin zoom: iOS Safari ignora user-scalable=no, así que se bloquean también el pellizco (gesture*),
+// el pellizco con varios dedos y el doble toque (touch-action en style.css); en escritorio, Ctrl + rueda y Ctrl +/−
+function blockZoom() {
+    const prevent = event => event.preventDefault();
+    ['gesturestart', 'gesturechange', 'gestureend'].forEach(type => document.addEventListener(type, prevent, { passive: false }));
+    document.addEventListener('touchmove', event => { if (event.touches.length > 1) event.preventDefault(); }, { passive: false });
+    document.addEventListener('wheel', event => { if (event.ctrlKey) event.preventDefault(); }, { passive: false });
+    document.addEventListener('keydown', event => {
+        if ((event.ctrlKey || event.metaKey) && ['+', '-', '=', '0'].includes(event.key)) event.preventDefault();
+    });
 }

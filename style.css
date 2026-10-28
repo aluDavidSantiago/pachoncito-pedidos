@@ -8,6 +8,11 @@
    · Tamaños fluidos con clamp() y rem; áreas táctiles de 44 px como mínimo.
    ========================================================================== */
 
+/* Sin zoom por doble toque (el pellizco se bloquea en ui.js) */
+html {
+    touch-action: pan-x pan-y;
+}
+
 /* ---------- Tokens: modo claro (papel cálido) ---------- */
 
 :root {
@@ -344,7 +349,10 @@ h2 {
     width: 8.75rem;
 }
 
+/* Centrado óptico: la imagen está centrada, pero la espiga pesa poco y el rótulo «Pachoncito» se percibe
+   desplazado a la derecha. Se compensa la mitad de esa diferencia (medido a 320–375 px). */
 .brand-logo {
+    translate: -2.6% 0;
     display: block;
     width: 100%;
     height: auto;
@@ -1572,6 +1580,115 @@ details[open] > .faq-body {
     gap: 0.25rem 0.75rem;
     font-size: var(--fs-sm);
     color: var(--text-muted);
+}
+
+/* ---------- Mi cuenta y Valoraciones: composición centrada y simétrica ---------- */
+
+.page-centered {
+    text-align: center;
+}
+
+.page-centered .stats-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+/* El panel pone la última tarjeta a todo el ancho en móvil; aquí las tres van en una fila */
+.page-centered .stat-card:last-child {
+    grid-column: auto;
+}
+
+/* El hueco de «instalar la app» (#installSlot) no debe romper la separación entre secciones */
+.page-centered > .page-section ~ .page-section {
+    margin-top: 1.75rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--hairline);
+}
+
+.page-centered .stat-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.875rem 0.375rem;
+}
+
+.page-centered .stat-card h3 {
+    font-size: clamp(0.625rem, 0.55rem + 0.4vw, 0.75rem);
+    letter-spacing: 0.02em;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+}
+
+.page-centered .section-desc,
+.page-centered .hint {
+    text-wrap: balance;
+    margin-inline: auto;
+}
+
+.page-centered .hint {
+    margin-bottom: 0.25rem;
+}
+
+.page-centered .stats-grid + .hint {
+    margin-bottom: 0;
+}
+
+.page-centered .review-card {
+    text-align: center;
+    padding: 1rem;
+}
+
+.page-centered .review-meta {
+    flex-direction: column;
+    justify-content: center;
+}
+
+.page-centered .review-scores,
+.page-centered .signed-in {
+    justify-content: center;
+}
+
+.page-centered .rating-summary {
+    align-items: center;
+}
+
+.page-centered .summary-row {
+    width: min(100%, 20rem);
+    grid-template-columns: 5.5rem auto 2.5em;
+    justify-content: center;
+    text-align: left;
+}
+
+.page-centered .rating {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.page-centered .rating legend {
+    margin-inline: auto;
+}
+
+.page-centered .choice-cards legend,
+.page-centered .field label {
+    text-align: center;
+    width: 100%;
+}
+
+.page-centered .alert-box.is-reward {
+    text-align: center;
+}
+
+.page-centered .btn-link {
+    align-self: center;
+    justify-content: center;
+    margin-inline: auto;
+    text-align: center;
+}
+
+.page-centered .page-section > .btn-link {
+    display: flex;
 }
 
 /* ---------- Cuenta del cliente ---------- */
