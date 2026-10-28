@@ -15,7 +15,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Pachoncito">
     <title>Pachoncito | Pedidos</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2.3.2">
 </head>
 <body>
     <div class="container">
@@ -29,7 +29,7 @@
                 </span>
             </a>
             <div class="nav-actions">
-                <button type="button" class="nav-sound" data-sound-toggle aria-pressed="true" aria-label="Sonido de la interfaz"><span data-icon="soundOn"></span></button>
+                <button type="button" class="nav-sound" data-sound-toggle aria-pressed="true" aria-label="Sonido de la interfaz"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11"/></svg></button>
             <a href="#pedido" class="nav-cta" data-nav-order aria-current="page"><span data-icon="bread"></span>Hacer pedido</a>
             </div>
         </nav>
@@ -54,6 +54,8 @@
                 <input type="tel" id="telefono" readonly aria-readonly="true">
             </div>
 
+            <p class="bakery-note"><span data-icon="flame"></span>Masa artesanal, horneada el mismo domingo de la entrega</p>
+
             <div class="products-section" id="pedido">
                 <div class="product-card" data-card="clasico">
                     <div class="product-main">
@@ -61,6 +63,7 @@
                         <div class="product-photo" aria-hidden="true"><span data-icon="bread"></span></div>
                         <div class="product-info">
                             <h3>Clásico</h3>
+[línea retirada: dato privado del obrador]
 [línea retirada: dato privado del obrador]
                             <span class="price" data-price="clasico"></span>
                         </div>
@@ -79,6 +82,7 @@
                         <div class="product-info">
                             <h3>Con Bocadillo</h3>
                             <span class="product-sub">Relleno de guayaba</span>
+                            <span class="product-tags"><span>Bocadillo de guayaba</span><span>Centro fundente</span></span>
                             <span class="price" data-price="bocadillo"></span>
                         </div>
                     </div>
@@ -188,6 +192,6 @@
         </footer>
     </div>
 
-    <script type="module" src="script.js"></script>
+    <script type="module" src="script.js?v=2.3.2"></script>
 </body>
 </html>

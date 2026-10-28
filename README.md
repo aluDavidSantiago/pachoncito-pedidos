@@ -87,7 +87,7 @@ el panel (**📱 Teléfonos vinculados**).
 
 * **Por volumen:** 1 ñapa por cada 10 € del pedido (envío incluido).
 * **Por invitación:** cada cliente tiene un código (p. ej. `ANA-7K3P`). Quien se da de alta con él queda vinculado; al entregarle su primer pedido, el recomendador acumula 1 ñapa (si ya tiene alguna compra entregada).
-* **Por feedback:** desde el panel se premia la primera reseña de cada cliente con 1 ñapa.
+* **Por valorar:** la primera reseña del cliente le da 1 ñapa automáticamente (con el teléfono confirmado). Valorar el segundo sabor no suma otra: las reglas (`isReviewReward`) solo aceptan +1 una vez por cliente (`feedbackRewarded`).
 * Al hacer el pedido, el cliente elige cuántas de sus ñapas acumuladas canjea (de 0 al total, campo opcional `creditsToRedeem`). Las elegidas aparecen en el panel y se descuentan al entregarlo; las demás siguen en su saldo. Los pedidos antiguos sin ese campo canjean todo el saldo, como antes.
 * Los clientes anteriores a las cuentas de Google (identificados por teléfono) se fusionan automáticamente con su nueva cuenta al entregarles el primer pedido.
 

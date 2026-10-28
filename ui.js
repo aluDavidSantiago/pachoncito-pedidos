@@ -78,7 +78,7 @@ export function initUI() {
 
 // Indicador de versión: texto informativo al final de la tarjeta (o del panel), sin enlaces
 function mountVersion() {
-    const host = document.querySelector('.container') || document.body;
+    const host = document.querySelector('.container, .admin-container') || document.body;
     host.append(el('p', { className: 'app-version', text: `Pachoncito v${APP_VERSION}` }));
 }
 
@@ -126,4 +126,13 @@ function mountSoundToggle() {
         playTap(); // confirma que vuelve a sonar (si se ha silenciado, no suena)
     });
     render();
+}
+
+// Rebote elástico de una tarjeta (al añadir un producto). Web Animations: solo transform, en el compositor
+export function nudge(node) {
+    if (reducedMotion() || !node.animate) return;
+    node.animate(
+        [{ transform: 'scale(1)' }, { transform: 'scale(1.025)' }, { transform: 'scale(1)' }],
+        { duration: 420, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' }
+    );
 }

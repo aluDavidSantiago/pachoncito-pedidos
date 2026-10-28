@@ -7,8 +7,8 @@ import { buildOrder, normalizeOrder, priceOrder } from "./orders.js";
 import { mountInstallPrompt, registerServiceWorker } from "./pwa.js";
 import { playReward, playSuccess, playTap } from "./sound.js";
 import { requireCustomer } from "./session.js";
-import { bump, initUI, mountTopNav } from "./ui.js";
-import { el, formatEUR, MAX_QTY, NAPA_EVERY_CENTS, PRICES_CENTS, showMessage, storage } from "./shared.js";
+import { bump, initUI, mountTopNav, nudge } from "./ui.js";
+import { el, formatEUR, MAX_QTY, NAPA_EVERY_CENTS, PRICES_CENTS, showMessage, storage, validateMobile } from "./shared.js";
 
 mountEnvBanner();
 registerServiceWorker();
@@ -106,11 +106,14 @@ function updateSummary() {
 }
 
 function setQty(product, value) {
+    const previous = quantities[product];
     const next = Math.min(MAX_QTY, Math.max(0, value));
-    if (next !== quantities[product]) bump($(product));
+    if (next !== previous) bump($(product));
     quantities[product] = next;
     $(product).textContent = next;
-    document.querySelector(`[data-card="${product}"]`).classList.toggle('is-selected', next > 0);
+    const card = document.querySelector(`[data-card="${product}"]`);
+    card.classList.toggle('is-selected', next > 0);
+    if (next > previous) nudge(card);
 }
 
 form.addEventListener('click', event => {
@@ -202,6 +205,13 @@ form.addEventListener('submit', async event => {
 
 prefill();
 toggleDireccion();
+
+// Cuentas anteriores a la validación estricta: si su teléfono no es un móvil español real, no se puede reservar
+// (las reglas también lo rechazan). Se avisa antes de que rellene el pedido.
+if (!session.isTest && !validateMobile(profile.phone).phone) {
+    submitBtn.disabled = true;
+    showMessage(message, 'El teléfono vinculado a tu cuenta no es un móvil español válido. Escríbenos por Instagram para corregirlo y poder reservar.', 'error');
+}
 napasAvailable = await loadAvailableNapas();
 napasToRedeem = napasAvailable;
 renderNapaRedeem();

@@ -1,11 +1,12 @@
 import {
-    collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, writeBatch
+    collection, doc, getDoc, getDocs, increment, limit, orderBy, query, serverTimestamp, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { mountEnvBanner, TEST_MODE } from "./env.js";
 import { mountFaq } from "./faq.js";
 import { db } from "./firebase.js";
 import { hydrateIcons } from "./icons.js";
 import { registerServiceWorker } from "./pwa.js";
+import { playReward } from "./sound.js";
 import { requireCustomer } from "./session.js";
 import { el, formatDate, PRODUCT_NAMES, RATING_ASPECTS, showMessage, starsText, withBusy } from "./shared.js";
 import { initUI, mountTopNav } from "./ui.js";
@@ -144,24 +145,41 @@ form.addEventListener('submit', async event => {
         return showMessage(message, 'Puntúa producto, entrega y atención (de 1 a 5 estrellas).', 'error');
     }
 
-    // La reseña pública no lleva datos personales; el vínculo con el teléfono va aparte y es privado
+    // La reseña pública no lleva datos personales; el vínculo con el teléfono va aparte y es privado.
+    // Recompensa: 1 sola ñapa por valorar, aunque se valoren los dos sabores. Va en el mismo lote que la reseña
+    // y firestore.rules (isReviewReward) solo la acepta una vez por cliente y con su teléfono confirmado.
     const id = reviewId(product);
+    const earnsNapa = !profile.feedbackRewarded && Boolean(profile.phoneVerified);
     const batch = writeBatch(db);
     batch.set(doc(db, 'reviews', id), {
         product, ratings, comment,
         test: session.isTest,
-        rewarded: false,
+        rewarded: earnsNapa,
         createdAt: serverTimestamp()
     });
     batch.set(doc(db, 'reviewAuthors', id), { uid: session.uid, product });
+    if (earnsNapa) {
+        batch.update(doc(db, 'customers', session.uid), {
+            napaCredits: increment(1),
+            feedbackRewarded: true,
+            updatedAt: serverTimestamp()
+        });
+    }
 
     try {
         await withBusy($('submitReviewBtn'), 'Publicando…', () => batch.commit());
         form.reset();
         await markReviewedProducts();
-        showMessage(message, session.isTest
-            ? '🧪 Reseña de prueba publicada. Solo se ve en modo pruebas (?pruebas=1) y en el panel.'
-            : 'Gracias por tu valoración. La revisaremos y, si es la primera, te guardaremos una ñapa para tu próximo pedido.', 'success');
+        if (earnsNapa) {
+            profile.feedbackRewarded = true;
+            profile.napaCredits = (profile.napaCredits || 0) + 1;
+            mountTopNav(profile);
+            playReward();
+        }
+        const thanks = earnsNapa
+            ? '¡Gracias por tu opinión! Has recibido 1 ñapa de regalo por tu pedido.'
+            : '¡Gracias por tu opinión! La ñapa por valorar ya la recibiste con tu primera reseña.';
+        showMessage(message, session.isTest ? `🧪 Reseña de prueba publicada. ${thanks}` : thanks, 'success');
         loadReviews();
     } catch (error) {
         console.error('Error al publicar la reseña:', error);

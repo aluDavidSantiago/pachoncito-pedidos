@@ -2,7 +2,7 @@
 // Estrategia "red primero": siempre se sirve la versión publicada más reciente y la caché solo se usa sin conexión,
 // así nunca se mezclan archivos de versiones distintas tras un despliegue.
 // Sube CACHE_VERSION si cambias la lista de archivos de SHELL.
-const CACHE_VERSION = 'pachoncito-v10';
+const CACHE_VERSION = 'pachoncito-v11';
 
 const SHELL = [
     './',
@@ -62,8 +62,12 @@ self.addEventListener('fetch', event => {
     // Solo lecturas de nuestros archivos y del SDK. Firestore/Auth (APIs) y el panel nunca pasan por la caché.
     if (request.method !== 'GET' || !CACHEABLE_HOSTS.includes(url.host) || url.pathname.includes('admin')) return;
 
+    // Nuestros archivos se revalidan siempre con el servidor (304 si no cambiaron): sin esto la caché HTTP del
+    // navegador (10 min en GitHub Pages) podía servir un CSS/JS anterior junto a un HTML nuevo
+    const revalidate = url.host === self.location.host && request.mode !== 'navigate';
+    const fresh = revalidate ? fetch(request, { cache: 'no-cache' }) : fetch(request);
     event.respondWith(
-        fetch(request)
+        fresh
             .then(response => {
                 if (response.ok) {
                     const copy = response.clone();
@@ -72,7 +76,7 @@ self.addEventListener('fetch', event => {
                 return response;
             })
             .catch(async () => {
-                const cached = await caches.match(request, { ignoreSearch: request.mode === 'navigate' });
+                const cached = await caches.match(request, { ignoreSearch: true }); // style.css?v=… → style.css
                 if (cached) return cached;
                 if (request.mode === 'navigate') return caches.match('index.html');
                 return Response.error();

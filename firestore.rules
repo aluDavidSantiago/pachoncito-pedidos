@@ -153,10 +153,32 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
     }
 
+    function reviewPath(id) {
+      return /databases/$(database)/documents/reviews/$(id);
+    }
+
+    // Reseña nueva de este cliente creada en el mismo lote
+    function createsReview(uid) {
+      return (!exists(reviewPath(uid + '_clasico')) && existsAfter(reviewPath(uid + '_clasico')))
+        || (!exists(reviewPath(uid + '_bocadillo')) && existsAfter(reviewPath(uid + '_bocadillo')));
+    }
+
+    // Ñapa por valorar: 1 sola por cliente (feedbackRewarded), exactamente +1, con el teléfono confirmado
+    // y solo junto a una reseña nueva. Valorar el segundo sabor ya no suma otra.
+    function isReviewReward(uid) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['napaCredits', 'feedbackRewarded', 'updatedAt'])
+        && resource.data.get('feedbackRewarded', false) != true
+        && resource.data.get('phoneVerified', false) == true
+        && request.resource.data.feedbackRewarded == true
+        && request.resource.data.napaCredits == resource.data.get('napaCredits', 0) + 1
+        && request.resource.data.updatedAt == request.time
+        && createsReview(uid);
+    }
+
     match /customers/{uid} {
       allow get: if isOwner(uid);
       allow create: if isOwner(uid) && validNewCustomer(request.resource.data, uid);
-      allow update: if isOwner(uid) && (isProfileEdit() || isPhoneRelink(uid));
+      allow update: if isOwner(uid) && (isProfileEdit() || isPhoneRelink(uid) || isReviewReward(uid));
       allow read, write: if isAdmin();
     }
 
@@ -240,6 +262,8 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.test == isAnonymous()
         && request.resource.data.phone == get(customerPath(request.auth.uid)).data.phone
+        // Y ese teléfono tiene que ser un móvil español real (o de prueba en las cuentas de prueba)
+        && allowedPhone(request.resource.data.phone)
         // Solo puede canjear las ñapas que tiene acumuladas (las no elegidas se le guardan)
         && request.resource.data.get('creditsToRedeem', 0) <= get(customerPath(request.auth.uid)).data.get('napaCredits', 0);
       // Generador de datos de prueba del panel
@@ -266,7 +290,7 @@ service cloud.firestore {
         && isStars(d.ratings.atencion)
         && d.comment is string
         && d.comment.size() <= 500
-        && d.rewarded == false
+        && d.rewarded is bool
         && d.createdAt == request.time;
     }
 
@@ -279,11 +303,16 @@ service cloud.firestore {
         && validReview(request.resource.data)
         && request.resource.data.test == isAnonymous()
         && get(customerPath(request.auth.uid)).data.get('purchased', {}).get(request.resource.data.product, 0) > 0
+        // rewarded: true solo si en este mismo lote el cliente recibe su única ñapa por valorar
+        && (request.resource.data.rewarded == false
+              || (getAfter(customerPath(request.auth.uid)).data.get('feedbackRewarded', false) == true
+                  && get(customerPath(request.auth.uid)).data.get('feedbackRewarded', false) != true))
         && existsAfter(/databases/$(database)/documents/reviewAuthors/$(reviewId));
       // Generador de datos de prueba del panel: clientes "seed_*", siempre marcadas como prueba
       allow create: if isAdmin()
         && reviewId.matches('^seed_.+')
         && validReview(request.resource.data)
+        && request.resource.data.rewarded == false
         && request.resource.data.test == true
         && existsAfter(/databases/$(database)/documents/reviewAuthors/$(reviewId));
       allow update: if isAdmin()
