@@ -23,7 +23,7 @@
             <div class="logo-container">
                 <picture class="brand-picture"><source srcset="icons/logo-tinta.png" media="(prefers-color-scheme: light)"><img src="icons/logo-blanco.png" alt="Pachoncito" class="brand-logo" width="300" height="73"></picture>
             </div>
-            <div class="badge">Reservas de Lunes a Viernes | Entregas los domingos</div>
+            <div class="badge">Reservas de lunes a viernes · Entregas los domingos</div>
             <a href="cuenta.html" class="account-chip" id="accountChip" aria-label="Mi cuenta y ñapas acumuladas">
                 <span data-icon="user"></span><span id="accountName">Mi cuenta</span>
                 <span class="chip-divider" aria-hidden="true"></span>
@@ -45,10 +45,15 @@
             </div>
 
             <div class="products-section">
-                <div class="product-card">
-                    <div class="product-info">
-                        <h3>Clásico</h3>
-                        <span class="price" data-price="clasico"></span>
+                <div class="product-card" data-card="clasico">
+                    <div class="product-main">
+                        <!-- Para poner la foto: <img src="img/clasico.jpg" alt="" width="112" height="112"> en lugar del icono -->
+                        <div class="product-photo" aria-hidden="true"><span data-icon="bread"></span></div>
+                        <div class="product-info">
+                            <h3>Clásico</h3>
+[línea retirada: dato privado del obrador]
+                            <span class="price" data-price="clasico"></span>
+                        </div>
                     </div>
                     <div class="counter">
                         <button type="button" data-product="clasico" data-delta="-1" aria-label="Quitar un clásico">−</button>
@@ -57,10 +62,15 @@
                     </div>
                 </div>
 
-                <div class="product-card">
-                    <div class="product-info">
-                        <h3>Con Bocadillo (Guayaba)</h3>
-                        <span class="price" data-price="bocadillo"></span>
+                <div class="product-card" data-card="bocadillo">
+                    <div class="product-main">
+                        <!-- Para poner la foto: <img src="img/bocadillo.jpg" alt="" width="112" height="112"> en lugar del icono -->
+                        <div class="product-photo" aria-hidden="true"><span data-icon="bread"></span></div>
+                        <div class="product-info">
+                            <h3>Con Bocadillo</h3>
+                            <span class="product-sub">Relleno de guayaba</span>
+                            <span class="price" data-price="bocadillo"></span>
+                        </div>
                     </div>
                     <div class="counter">
                         <button type="button" data-product="bocadillo" data-delta="-1" aria-label="Quitar uno con bocadillo">−</button>
@@ -110,6 +120,22 @@
                 Por cada 10 € de pedido te regalamos una ñapa.
             </div>
 
+            <!-- Ñapas acumuladas (invitaciones / reseñas): el cliente elige cuántas canjear; las demás se le guardan -->
+            <div class="napa-redeem" id="napaRedeem" hidden>
+                <div class="napa-redeem-info">
+                    <span data-icon="gift" class="napa-redeem-icon"></span>
+                    <div>
+                        <strong>Canjear ñapas acumuladas</strong>
+                        <span class="hint" id="napaRedeemHint">Tienes 0 disponibles</span>
+                    </div>
+                </div>
+                <div class="counter">
+                    <button type="button" data-redeem="-1" aria-label="Canjear una ñapa menos">−</button>
+                    <output id="napaRedeemQty" aria-live="polite">0</output>
+                    <button type="button" data-redeem="1" aria-label="Canjear una ñapa más">+</button>
+                </div>
+            </div>
+
             <div class="field">
                 <label for="tipoEntrega">Método de Entrega</label>
                 <select id="tipoEntrega">
@@ -135,6 +161,7 @@
 
             <div class="summary">
                 <p class="summary-total">Total a pagar <strong id="totalPrice">0,00 €</strong></p>
+                <p class="payment-note"><span data-icon="cash"></span>Pago solo en efectivo al recoger o recibir el pedido</p>
                 <button type="submit" class="btn btn-primary" id="submitBtn">Reservar para el domingo</button>
             </div>
         </form>

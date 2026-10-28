@@ -57,6 +57,12 @@ function buildFaqDialog() {
                     el('li', { text: 'En «Mi cuenta» puedes seguir el estado de tu pedido: pendiente, en preparación, listo y entregado.' })
                 )
             ),
+            faqItem('cash', '¿Cómo se paga?',
+                el('p', {}, 'El pago es ', el('strong', { text: 'solo en efectivo' }), ', en el momento de la recogida o de la entrega a domicilio. No pedimos datos de tarjeta ni pagos por adelantado.')
+            ),
+            faqItem('gift', '¿Cómo uso mis ñapas acumuladas?',
+                el('p', { text: 'Al hacer tu pedido eliges cuántas de tus ñapas acumuladas (por invitar amigos o valorar) quieres canjear: todas, algunas o ninguna. Las que no uses se quedan guardadas en tu cuenta para el siguiente pedido.' })
+            ),
             faqItem('clipboard', '¿Qué alérgenos tienen?',
                 el('p', { text: 'Nuestros pandebonos contienen lácteos (queso) y huevo, y pueden contener trazas de otros alérgenos habituales en el obrador. Encontrarás el detalle en la carta, en «Información alimentaria y alérgenos».' }),
                 el('p', { text: 'Si tienes una alergia o intolerancia, escríbenos antes de hacer tu pedido.' })

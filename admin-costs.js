@@ -1,10 +1,10 @@
 // Monitor de costes del obrador: materias primas con su proveedor, precio actual frente al anterior
 // y margen por pandebono. Los datos viven en Firestore y solo los lee/escribe el obrador:
 //   ingredients/{id}  → formato del envase, precio, precio anterior y cantidad usada
-//   settings/costs    → unidades por tanda, otros costes (envase, bolsas, luz) y versión del catálogo
+//   settings/costs    → otros costes (envase, bolsas, luz) y versión del catálogo
 //
-// Cada ingrediente se usa por TANDA de masa (scope 'batch', campo usagePerBatch) o por cada pandebono de
-// BOCADILLO (scope 'bocadillo', campo usagePerUnit: el relleno de guayaba).
+// 1 tanda = 8 pandebonos (UNITS_PER_BATCH). Cada ingrediente se usa por TANDA de masa (scope 'batch',
+// campo usagePerBatch) o por cada pandebono de BOCADILLO (scope 'bocadillo', campo usagePerUnit: la guayaba).
 import {
     collection, deleteField, doc, getDoc, getDocs, onSnapshot, serverTimestamp, updateDoc, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -12,11 +12,11 @@ import { icon } from "./icons.js";
 import { el, PRICES_CENTS, PRODUCT_NAMES } from "./shared.js";
 
 // Sube este número cuando cambie el catálogo por defecto: ensureCostData() añadirá lo nuevo sin pisar lo editado.
-const CATALOG_VERSION = 2;
+const CATALOG_VERSION = 3;
 
 // Formatos y precios consultados en la ficha de cada proveedor el 27/10/2026.
 [línea retirada: dato privado del obrador]
-// Cantidades: las del panel anterior; azúcar, sal y leche son estimaciones de la receta estándar (usageEstimated).
+[línea retirada: dato privado del obrador]
 const DEFAULT_INGREDIENTS = [
 [línea retirada: dato privado del obrador]
 [línea retirada: dato privado del obrador]
@@ -29,8 +29,11 @@ const DEFAULT_INGREDIENTS = [
     { id: 'guayaba', name: 'Pasta de guayaba (bocadillo)', supplier: 'Compra en tienda', url: null, packAmount: 1000, unit: 'g', packPriceCents: 500, scope: 'bocadillo', usagePerUnit: 15 }
 ];
 
-// Del panel anterior: envase, bolsas y luz 0,74 € por tanda de 16
-const DEFAULT_SETTINGS = { unitsPerBatch: 16, otherPerBatchCents: 74 };
+// 1 tanda = 8 pandebonos. Envase, bolsas y luz: 0,37 € por tanda (los 0,74 € que se usaban para 16)
+export const UNITS_PER_BATCH = 8;
+const DEFAULT_SETTINGS = { unitsPerBatch: UNITS_PER_BATCH, otherPerBatchCents: 37 };
+// Versión del catálogo a partir de la cual las cantidades guardadas ya son por tanda de 8
+const RECIPE_V8 = 3;
 
 const UNIT_LABEL = { u: 'u', g: 'g', ml: 'ml' };
 const eur = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
@@ -70,8 +73,12 @@ export async function ensureCostData(db) {
             return;
         }
         const patch = { order, scope: current.scope || data.scope || 'batch' };
-        // Solo se completan cantidades que seguían vacías: lo que el obrador haya escrito se respeta
-        if (data.usagePerBatch != null && current.usagePerBatch == null) {
+        if (data.usagePerBatch != null && (settings?.catalogVersion || 0) < RECIPE_V8) {
+[línea retirada: dato privado del obrador]
+            patch.usagePerBatch = data.usagePerBatch;
+            patch.usageEstimated = false;
+        } else if (data.usagePerBatch != null && current.usagePerBatch == null) {
+            // Solo se completan cantidades que seguían vacías: lo que el obrador haya escrito se respeta
             patch.usagePerBatch = data.usagePerBatch;
             patch.usageEstimated = Boolean(data.usageEstimated);
         }
@@ -81,7 +88,13 @@ export async function ensureCostData(db) {
 
     if (settings) {
         // fillingPerUnitCents (relleno fijo) queda sustituido por el ingrediente «guayaba»
-        batch.update(settingsRef, { catalogVersion: CATALOG_VERSION, fillingPerUnitCents: deleteField(), updatedAt: serverTimestamp() });
+        const patch = { catalogVersion: CATALOG_VERSION, fillingPerUnitCents: deleteField(), updatedAt: serverTimestamp() };
+        if ((settings.catalogVersion || 0) < RECIPE_V8) {
+            const oldUnits = settings.unitsPerBatch || 16;
+            patch.unitsPerBatch = UNITS_PER_BATCH;
+            patch.otherPerBatchCents = Math.round((settings.otherPerBatchCents ?? 74) * UNITS_PER_BATCH / oldUnits);
+        }
+        batch.update(settingsRef, patch);
     } else {
         batch.set(settingsRef, { ...DEFAULT_SETTINGS, catalogVersion: CATALOG_VERSION, updatedAt: serverTimestamp() });
     }
@@ -133,11 +146,10 @@ function ingredientCents(ing, priceCents = ing.packPriceCents) {
 }
 
 export function unitCosts({ ingredients, settings }) {
-    const units = settings.unitsPerBatch || DEFAULT_SETTINGS.unitsPerBatch;
     const batchCents = ingredients.filter(ing => !isPerBocadillo(ing))
         .reduce((sum, ing) => sum + ingredientCents(ing), 0) + (settings.otherPerBatchCents || 0);
     const fillingCents = ingredients.filter(isPerBocadillo).reduce((sum, ing) => sum + ingredientCents(ing), 0);
-    const clasico = batchCents / units;
+    const clasico = batchCents / UNITS_PER_BATCH;
     return {
         batchCents,
         fillingCents,
@@ -148,16 +160,15 @@ export function unitCosts({ ingredients, settings }) {
 }
 
 // Cuánto cambia el coste de cada pandebono (o de cada bocadillo) por el último cambio de precio
-export function priceImpactPerUnit(ing, settings) {
+export function priceImpactPerUnit(ing) {
     if (!isComplete(ing) || !Number.isFinite(ing.previousPackPriceCents)) return null;
     const delta = ingredientCents(ing) - ingredientCents(ing, ing.previousPackPriceCents);
-    return isPerBocadillo(ing) ? delta : delta / (settings.unitsPerBatch || DEFAULT_SETTINGS.unitsPerBatch);
+    return isPerBocadillo(ing) ? delta : delta / UNITS_PER_BATCH;
 }
 
 // Envases a comprar: la masa va por tandas (todos los pandebonos); el relleno, por cada bocadillo
-export function shoppingList({ ingredients, settings }, { units, bocadillos }) {
-    const perBatch = settings.unitsPerBatch || DEFAULT_SETTINGS.unitsPerBatch;
-    const batches = Math.ceil(units / perBatch);
+export function shoppingList({ ingredients }, { units, bocadillos }) {
+    const batches = Math.ceil(units / UNITS_PER_BATCH);
     return {
         batches,
         items: ingredients.filter(isComplete).map(ing => {
@@ -188,9 +199,9 @@ function trendChip(ing) {
     }, icon(up ? 'arrowUp' : 'arrowDown'), `${up ? '+' : '−'}${money(Math.abs(ing.packPriceCents - prev))}`);
 }
 
-function ingredientCard(ing, settings, handlers) {
+function ingredientCard(ing, handlers) {
     const prev = ing.previousPackPriceCents;
-    const impact = priceImpactPerUnit(ing, settings);
+    const impact = priceImpactPerUnit(ing);
     const unit = UNIT_LABEL[ing.unit] || ing.unit;
     const perUnitLabel = isPerBocadillo(ing) ? 'cada pandebono de bocadillo' : 'cada pandebono';
 
@@ -259,13 +270,12 @@ export function renderCostMonitor(container, data, handlers) {
     const { ingredients, settings } = data;
     const costs = unitCosts(data);
     const otherInput = el('input', { type: 'number', inputmode: 'decimal', step: '0.01', min: '0', value: ((settings.otherPerBatchCents || 0) / 100).toFixed(2), 'aria-label': 'Otros costes por tanda' });
-    const unitsInput = el('input', { type: 'number', inputmode: 'numeric', step: '1', min: '1', value: settings.unitsPerBatch, 'aria-label': 'Pandebonos por tanda' });
 
     container.replaceChildren(
         el('div', { className: 'margin-panel' },
             el('div', { className: 'margin-head' },
                 el('h3', {}, icon('trend'), 'Margen por pandebono'),
-                el('span', { className: 'hint', text: `Tanda de ${settings.unitsPerBatch} u · masa ${money(costs.batchCents)} · relleno ${moneyFine(costs.fillingCents)}/u` })
+                el('span', { className: 'hint', text: `Tanda de ${UNITS_PER_BATCH} u · masa ${money(costs.batchCents)} · relleno ${moneyFine(costs.fillingCents)}/u` })
             ),
             marginRow(PRODUCT_NAMES.clasico, PRICES_CENTS.clasico, costs.clasico),
             marginRow(PRODUCT_NAMES.bocadillo, PRICES_CENTS.bocadillo, costs.bocadillo),
@@ -273,15 +283,14 @@ export function renderCostMonitor(container, data, handlers) {
                 ? el('p', { className: 'impact-line is-warning', text: `Coste incompleto: falta la cantidad usada de ${costs.missing.join(', ')}.` })
                 : null
         ),
-        el('div', { className: 'cost-grid' }, ingredients.map(ing => ingredientCard(ing, settings, handlers))),
+        el('div', { className: 'cost-grid' }, ingredients.map(ing => ingredientCard(ing, handlers))),
         el('details', { className: 'recipe-spec other-costs' },
-            el('summary', {}, 'Otros costes y tamaño de tanda', icon('chevron', 'icon chevron')),
+            el('summary', {}, 'Otros costes por tanda', icon('chevron', 'icon chevron')),
             el('div', { className: 'spec-grid' },
                 el('label', {}, el('span', { text: 'Envase, bolsas y luz por tanda (€)' }), otherInput),
-                el('label', {}, el('span', { text: 'Pandebonos por tanda' }), unitsInput),
                 el('button', {
                     type: 'button', className: 'btn btn-small',
-                    onClick: () => handlers.onSettings(otherInput, unitsInput)
+                    onClick: () => handlers.onSettings(otherInput)
                 }, 'Guardar')
             )
         )
@@ -295,7 +304,7 @@ export function renderShoppingList(container, data, { units, bocadillos }) {
     }
     const { batches, items } = shoppingList(data, { units, bocadillos });
     container.replaceChildren(
-        el('p', { className: 'hint', text: `${batches} ${batches === 1 ? 'tanda' : 'tandas'} de ${data.settings.unitsPerBatch} para ${units} pandebonos (${bocadillos} con bocadillo)` }),
+        el('p', { className: 'hint', text: `${batches} ${batches === 1 ? 'tanda' : 'tandas'} de ${UNITS_PER_BATCH} para ${units} pandebonos (${bocadillos} con bocadillo)` }),
         ...items.map(({ ing, needed, packs }) => el('div', { className: 'ingredient-item' },
             ing.url
                 ? el('a', { className: 'supplier-link', href: ing.url, target: '_blank', rel: 'noopener noreferrer' }, ing.name, icon('external'))

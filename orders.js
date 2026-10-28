@@ -14,7 +14,8 @@ export function priceOrder(items, deliveryMethod) {
 }
 
 // uid = cuenta del cliente; phone = su teléfono/WhatsApp vinculado (contacto para la entrega)
-export function buildOrder({ uid, name, phone, items, deliveryMethod, address, slot, test }) {
+// creditsToRedeem = ñapas acumuladas que el cliente elige canjear en este pedido (0…saldo); las demás se le guardan
+export function buildOrder({ uid, name, phone, items, deliveryMethod, address, slot, test, creditsToRedeem }) {
     return {
         uid,
         customerName: name,
@@ -24,6 +25,7 @@ export function buildOrder({ uid, name, phone, items, deliveryMethod, address, s
         deliveryMethod,
         address: deliveryMethod === 'domicilio' ? address : PICKUP_ADDRESS,
         deliverySlot: slot,
+        ...(Number.isInteger(creditsToRedeem) ? { creditsToRedeem } : {}),
         status: 'pending',
         test: Boolean(test),
         createdAt: serverTimestamp()
@@ -38,6 +40,8 @@ export function normalizeOrder(snap) {
         // Compatibilidad con pedidos antiguos (en euros y sin cuenta de cliente)
         totalCents: Number.isInteger(data.totalCents) ? data.totalCents : Math.round((data.total || 0) * 100),
         napaCount: data.napaCount ?? (data.hasNapa ? 1 : 0),
+        // null = pedido anterior a la elección de ñapas: canjea todo el saldo, como antes
+        creditsToRedeem: Number.isInteger(data.creditsToRedeem) ? data.creditsToRedeem : null,
         phoneKey: normalizePhone(data.phone),
         uid: data.uid || null
     };
@@ -45,7 +49,7 @@ export function normalizeOrder(snap) {
 
 // Al entregar un pedido (en una sola transacción):
 //  · el obrador confirma el teléfono del cliente (phoneVerified) — es la verificación antifraude;
-//  · se registra la compra (habilita sus reseñas) y se canjean sus ñapas acumuladas;
+//  · se registra la compra (habilita sus reseñas) y se canjean las ñapas acumuladas que eligió (el resto se guarda);
 //  · si es su primera compra y se dio de alta con un código de invitación, su recomendador gana 1 ñapa;
 //  · si existía un expediente antiguo con su teléfono (antes de las cuentas de Google), se fusiona.
 export function completeOrder(db, orderId) {
@@ -98,7 +102,8 @@ export function completeOrder(db, orderId) {
         // ---- Escrituras ----
         const purchased = customer.purchased || {};
         const legacyPurchased = legacy?.purchased || {};
-        const creditsRedeemed = (customer.napaCredits || 0) + (legacy?.napaCredits || 0);
+        const available = (customer.napaCredits || 0) + (legacy?.napaCredits || 0);
+        const creditsRedeemed = Math.min(order.creditsToRedeem ?? available, available);
         const customerUpdate = {
             completedOrders: (customer.completedOrders || 0) + (legacy?.completedOrders || 0) + 1,
             totalSpentCents: (customer.totalSpentCents || 0) + (legacy?.totalSpentCents || 0) + order.totalCents,
@@ -106,7 +111,7 @@ export function completeOrder(db, orderId) {
                 clasico: (purchased.clasico || 0) + (legacyPurchased.clasico || 0) + (order.items?.clasico || 0),
                 bocadillo: (purchased.bocadillo || 0) + (legacyPurchased.bocadillo || 0) + (order.items?.bocadillo || 0)
             },
-            napaCredits: 0,
+            napaCredits: available - creditsRedeemed,
             phoneVerified: true,
             updatedAt: serverTimestamp()
         };

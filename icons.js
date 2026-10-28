@@ -31,7 +31,10 @@ const ICONS = {
     cart: '<circle cx="9.5" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/><path d="M3 4h2.4l2.3 11h10.5l2-8H6.3"/>',
     trend: '<path d="M4 16.5l5-5 3.5 3.5L20 7.5M15 7.5h5v5"/>',
     layers: '<path d="M12 4 3 8.5l9 4.5 9-4.5z"/><path d="M3 12.5l9 4.5 9-4.5M3 16.5l9 4.5 9-4.5"/>',
-    chevron: '<path d="M7 10l5 5 5-5"/>'
+    chevron: '<path d="M7 10l5 5 5-5"/>',
+    cash: '<rect x="2.5" y="6.5" width="19" height="11" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v.1M18 14.5v.1"/>',
+    check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    oven: '<rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 8.5h17M7 6.3v.1M10 6.3v.1"/><rect x="7" y="11.5" width="10" height="5.5" rx="1"/>'
 };
 
 export function icon(name, className = 'icon') {

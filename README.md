@@ -60,6 +60,12 @@ Plataforma web desarrollada para la gestión, procesamiento y control de pedidos
    firebase deploy --only firestore:rules
    ```
 
+## Producción y costes
+
+* **1 tanda = 8 pandebonos** (`UNITS_PER_BATCH` en `admin-costs.js`). El panel separa **Pendientes de hornear** (pedidos pendientes o en preparación) y **Horneados** (listos o entregados), y expresa lo pendiente en tandas completas de 8.
+[línea retirada: dato privado del obrador]
+* Pago **solo en efectivo** al recoger o recibir el pedido.
+
 ## Antifraude: un teléfono, una cuenta
 
 Al darse de alta, el cliente vincula su teléfono/WhatsApp. Firestore guarda un cerrojo `phoneClaims/{teléfono}`
@@ -76,7 +82,7 @@ el panel (**📱 Teléfonos vinculados**).
 * **Por volumen:** 1 ñapa por cada 10 € del pedido (envío incluido).
 * **Por invitación:** cada cliente tiene un código (p. ej. `ANA-7K3P`). Quien se da de alta con él queda vinculado; al entregarle su primer pedido, el recomendador acumula 1 ñapa (si ya tiene alguna compra entregada).
 * **Por feedback:** desde el panel se premia la primera reseña de cada cliente con 1 ñapa.
-* Las ñapas acumuladas aparecen en el siguiente pedido del cliente en el panel y se canjean al entregarlo.
+* Al hacer el pedido, el cliente elige cuántas de sus ñapas acumuladas canjea (de 0 al total, campo opcional `creditsToRedeem`). Las elegidas aparecen en el panel y se descuentan al entregarlo; las demás siguen en su saldo. Los pedidos antiguos sin ese campo canjean todo el saldo, como antes.
 * Los clientes anteriores a las cuentas de Google (identificados por teléfono) se fusionan automáticamente con su nueva cuenta al entregarles el primer pedido.
 
 ## Pruebas

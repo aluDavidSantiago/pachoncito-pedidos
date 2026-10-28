@@ -10,7 +10,7 @@ import {
     enrollBiometric, forgetBiometric, getEnrollment, isUnlocked, lockPanel, markUnlocked, verifyBiometric
 } from "./admin-biometric.js";
 import {
-    ensureCostData, parseEuros, renderCostMonitor, renderShoppingList, unitCosts,
+    ensureCostData, parseEuros, UNITS_PER_BATCH, renderCostMonitor, renderShoppingList, unitCosts,
     updateCostSettings, updateIngredientSpec, updatePackPrice, watchCostData
 } from "./admin-costs.js";
 import { adminAuth, adminDb as db } from "./admin-firebase.js";
@@ -357,42 +357,66 @@ const ordersOfSunday = () => (filters.sunday === 'all' ? orders : orders.filter(
 
 const customerOf = order => (order.uid ? customers.get(order.uid) : null);
 
-// Ñapas acumuladas (invitaciones / feedback) que se entregan con este pedido
-function accumulatedNapas(order) {
-    if (order.status === 'completed') return order.creditsRedeemed || 0;
-    return customerOf(order)?.napaCredits || 0;
+// Ñapas acumuladas (invitaciones / feedback) que se entregan con cada pedido. El cliente elige cuántas canjear
+// (creditsToRedeem); en pedidos antiguos sin esa elección se entregan todas. Si tiene varios pedidos abiertos,
+// su saldo se reparte del más antiguo al más reciente, igual que se descontará al entregarlos.
+function creditsByOrder(list) {
+    const remaining = new Map();
+    const result = new Map();
+    for (const order of [...list].reverse()) {
+        if (order.status === 'completed') {
+            result.set(order.id, order.creditsRedeemed || 0);
+            continue;
+        }
+        if (order.status === 'rejected' || !order.uid) continue;
+        const left = remaining.has(order.uid) ? remaining.get(order.uid) : (customerOf(order)?.napaCredits || 0);
+        const credits = Math.min(order.creditsToRedeem ?? left, left);
+        remaining.set(order.uid, left - credits);
+        result.set(order.id, credits);
+    }
+    return result;
 }
 
+let orderCredits = new Map();
+
+// Estados que ya salieron del horno: «Listo» y «Entregado». Pendiente y En preparación faltan por hornear.
+const BAKED = ['ready', 'completed'];
+
 function productionOf(list) {
-    let clasicos = 0, bocadillos = 0, napas = 0, ingresosCents = 0;
-    const customersWithCredits = new Set();
+    const p = { clasicos: 0, bocadillos: 0, napas: 0, units: 0, pendingUnits: 0, bakedUnits: 0, ingresosCents: 0 };
     for (const order of list) {
         if (order.status === 'rejected') continue;
-        clasicos += order.items?.clasico || 0;
-        bocadillos += order.items?.bocadillo || 0;
-        napas += order.napaCount;
-        ingresosCents += order.totalCents;
-        if (order.status === 'completed') {
-            napas += order.creditsRedeemed || 0;
-        } else if (order.uid && !customersWithCredits.has(order.uid)) {
-            // Un cliente con varios pedidos abiertos solo canjea sus ñapas una vez
-            customersWithCredits.add(order.uid);
-            napas += customerOf(order)?.napaCredits || 0;
-        }
+        const clasicos = order.items?.clasico || 0;
+        const bocadillos = order.items?.bocadillo || 0;
+        const napas = order.napaCount + (orderCredits.get(order.id) || 0);
+        const units = clasicos + bocadillos + napas;
+        p.clasicos += clasicos;
+        p.bocadillos += bocadillos;
+        p.napas += napas;
+        p.units += units;
+        p[BAKED.includes(order.status) ? 'bakedUnits' : 'pendingUnits'] += units;
+        p.ingresosCents += order.totalCents;
     }
-    return { clasicos, bocadillos, napas, units: clasicos + bocadillos + napas, ingresosCents };
+    return p;
 }
 
 function renderProduction() {
+    // El reparto de ñapas se calcula sobre todos los pedidos: el saldo de un cliente es uno solo
+    orderCredits = creditsByOrder(orders);
     const p = productionOf(ordersOfSunday());
-    const perBatch = costData?.settings.unitsPerBatch || 16;
-    const batches = Math.ceil(p.units / perBatch);
+    // Se hornea por tandas completas de 8: lo que sobra de la última tanda queda como excedente
+    const batches = Math.ceil(p.pendingUnits / UNITS_PER_BATCH);
+    const spare = batches * UNITS_PER_BATCH - p.pendingUnits;
     // Las ñapas son pandebonos clásicos de regalo: cuentan como coste, no como ingreso
     const costs = costData ? unitCosts(costData) : null;
     const costCents = costs ? (p.clasicos + p.napas) * costs.clasico + p.bocadillos * costs.bocadillo : 0;
 
-    $('kpiTotal').textContent = p.units;
-    $('kpiBatches').textContent = `${batches} ${batches === 1 ? 'tanda' : 'tandas'} de ${perBatch}`;
+    $('kpiPendientes').textContent = p.pendingUnits;
+    $('kpiHorneados').textContent = p.bakedUnits;
+    $('kpiBatches').textContent = batches
+        ? `${batches} ${batches === 1 ? 'tanda' : 'tandas'} × ${UNITS_PER_BATCH} = ${batches * UNITS_PER_BATCH} panes${spare ? ` (${spare} de excedente)` : ''}`
+        : 'Nada pendiente de hornear';
+    $('kpiTotalDia').textContent = `de ${p.units} en total`;
     $('kpiClasicos').textContent = p.clasicos;
     $('kpiBocadillo').textContent = p.bocadillos;
     $('kpiNapas').textContent = p.napas;
@@ -441,7 +465,7 @@ function metaLine(...parts) {
 function orderCard(order) {
     const status = STATUS[order.status] || STATUS.pending;
     const isClosed = order.status === 'completed';
-    const credits = accumulatedNapas(order);
+    const credits = orderCredits.get(order.id) || 0;
     const customer = customerOf(order);
     const phoneNode = order.phoneKey
         ? el('a', { className: 'order-phone', href: `tel:${order.phoneKey}`, text: order.phone })
@@ -470,6 +494,8 @@ function orderCard(order) {
                 text: isClosed
                     ? `Se entregaron ${credits} ${credits === 1 ? 'ñapa acumulada' : 'ñapas acumuladas'} (invitaciones / reseñas)`
                     : `+${credits} ${credits === 1 ? 'ñapa acumulada' : 'ñapas acumuladas'} (invitaciones / reseñas): entrégalas en este pedido`
+                        + (order.creditsToRedeem !== null && (customer?.napaCredits || 0) > credits
+                            ? ` · se le guardan ${(customer.napaCredits || 0) - credits}` : '')
             })
             : null,
         customer?.referredByCode && !customer.completedOrders
@@ -522,7 +548,7 @@ async function changeStatus(order, newStatus, button) {
     try {
         if (newStatus === 'completed') {
             const ok = confirm(`¿Marcar como entregado?\n\nAl hacerlo confirmas que el teléfono ${order.phone || ''} es de este cliente. `
-                + 'Se registrará su compra, se canjearán sus ñapas acumuladas y, si es su primer pedido y vino invitado, '
+                + 'Se registrará su compra, se canjearán las ñapas acumuladas que eligió (el resto se le guarda) y, si es su primer pedido y vino invitado, '
                 + 'su recomendador ganará una ñapa. No se puede deshacer.');
             if (!ok) return;
             const result = await withBusy(button, '…', () => completeOrder(db, order.id));
@@ -592,15 +618,14 @@ const costHandlers = {
             toast('No se pudo guardar.', 'error');
         }
     },
-    async onSettings(otherInput, unitsInput) {
+    async onSettings(otherInput) {
         const otherPerBatchCents = parseEuros(otherInput.value);
-        const unitsPerBatch = parseInt(unitsInput.value, 10);
-        if (otherPerBatchCents === null || !(unitsPerBatch > 0)) {
-            toast('Revisa el importe y el tamaño de la tanda.', 'error');
+        if (otherPerBatchCents === null) {
+            toast('Revisa el importe.', 'error');
             return;
         }
         try {
-            await updateCostSettings(db, { otherPerBatchCents, unitsPerBatch });
+            await updateCostSettings(db, { otherPerBatchCents });
             toast('Costes generales guardados.', 'success');
         } catch (error) {
             console.error('Error al guardar los ajustes:', error);

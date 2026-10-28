@@ -13,6 +13,7 @@ rules_version = '2';
 //   phoneClaims/{teléfono}   Cerrojo antifraude: un teléfono = una cuenta (y una cuenta = un teléfono).
 //   referralCodes/{código}   Código de invitación de cada cliente → su UID.
 //   orders/{id}              El cliente crea pedidos a su nombre y con su teléfono vinculado; lee los suyos.
+//                            creditsToRedeem (opcional): ñapas acumuladas que elige canjear en ese pedido.
 //   reviews/{uid_producto}   Públicas y anónimas. Una por cliente y producto, solo con compra entregada.
 //   reviewAuthors/{id}       Privado. Vincula cada reseña con su autor (solo lo ve el obrador).
 //   customers/{teléfono}     Expedientes antiguos (antes de las cuentas de Google): solo el obrador.
@@ -196,7 +197,7 @@ service cloud.firestore {
                               'status', 'test', 'createdAt'])
         && d.keys().hasOnly(['uid', 'customerName', 'phone', 'items', 'subtotalCents', 'deliveryCents',
                              'totalCents', 'napaCount', 'deliveryMethod', 'address', 'deliverySlot',
-                             'status', 'test', 'createdAt'])
+                             'status', 'test', 'createdAt', 'creditsToRedeem'])
         && d.uid is string
         && validName(d.customerName)
         && isPhone(d.phone)
@@ -211,6 +212,7 @@ service cloud.firestore {
         && d.subtotalCents == d.items.clasico * 150 + d.items.bocadillo * 170
         && d.totalCents == d.subtotalCents + d.deliveryCents
         && d.napaCount == math.floor(d.totalCents / 1000)
+        && (!('creditsToRedeem' in d) || isQty(d.creditsToRedeem))
         && d.address is string
         && (d.deliveryMethod == 'domicilio'
               ? (d.address.size() >= 5 && d.address.size() <= 200)
@@ -228,7 +230,9 @@ service cloud.firestore {
         && validNewOrder(request.resource.data)
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.test == isAnonymous()
-        && request.resource.data.phone == get(customerPath(request.auth.uid)).data.phone;
+        && request.resource.data.phone == get(customerPath(request.auth.uid)).data.phone
+        // Solo puede canjear las ñapas que tiene acumuladas (las no elegidas se le guardan)
+        && request.resource.data.get('creditsToRedeem', 0) <= get(customerPath(request.auth.uid)).data.get('napaCredits', 0);
       // Generador de datos de prueba del panel
       allow create: if isAdmin()
         && validNewOrder(request.resource.data)

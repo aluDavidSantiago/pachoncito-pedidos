@@ -85,8 +85,19 @@ function orderItem(order) {
         ),
         order.napaCount > 0
             ? el('p', { className: 'meta-success', text: `${order.napaCount} ${order.napaCount === 1 ? 'ñapa' : 'ñapas'} de regalo` })
+            : null,
+        redeemedText(order)
+            ? el('p', { className: 'meta-success', text: redeemedText(order) })
             : null
     );
+}
+
+// Ñapas acumuladas que el cliente eligió canjear en ese pedido (o que se canjearon al entregarlo)
+function redeemedText(order) {
+    const n = order.status === 'completed' ? order.creditsRedeemed : order.creditsToRedeem;
+    if (!(n > 0) || order.status === 'rejected') return null;
+    const verb = order.status === 'completed' ? (n === 1 ? 'canjeada' : 'canjeadas') : (n === 1 ? 'reservada' : 'reservadas');
+    return `${n} ${n === 1 ? 'ñapa acumulada' : 'ñapas acumuladas'} ${verb}`;
 }
 
 async function loadOrders() {

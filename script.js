@@ -1,9 +1,9 @@
-import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { addDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { mountEnvBanner } from "./env.js";
 import { mountFaq } from "./faq.js";
 import { db } from "./firebase.js";
 import { hydrateIcons } from "./icons.js";
-import { buildOrder, priceOrder } from "./orders.js";
+import { buildOrder, normalizeOrder, priceOrder } from "./orders.js";
 import { mountInstallPrompt, registerServiceWorker } from "./pwa.js";
 import { requireCustomer } from "./session.js";
 import { bump, initUI } from "./ui.js";
@@ -24,6 +24,9 @@ const submitBtn = $('submitBtn');
 const message = $('formMessage');
 const SUBMIT_LABEL = submitBtn.textContent;
 const quantities = { clasico: 0, bocadillo: 0 };
+const OPEN_STATUSES = ['pending', 'preparing', 'ready'];
+let napasAvailable = 0;
+let napasToRedeem = 0;
 
 $('accountName').textContent = profile.name.split(' ')[0];
 $('napaBalance').textContent = profile.napaCredits || 0;
@@ -39,6 +42,39 @@ for (let minutes = 6 * 60; minutes <= 17 * 60 + 30; minutes += 30) {
     const slot = `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${minutes % 60 === 0 ? '00' : '30'}`;
     $('hora').append(new Option(slot, slot));
 }
+
+// Ñapas que puede canjear: su saldo menos las ya reservadas en pedidos aún sin entregar
+async function loadAvailableNapas() {
+    const balance = profile.napaCredits || 0;
+    if (!balance) return 0;
+    try {
+        const snap = await getDocs(query(collection(db, 'orders'), where('uid', '==', session.uid)));
+        const reserved = snap.docs.map(normalizeOrder)
+            .filter(order => OPEN_STATUSES.includes(order.status))
+            .reduce((sum, order) => sum + (order.creditsToRedeem ?? balance), 0);
+        return Math.max(0, balance - reserved);
+    } catch (error) {
+        console.error('Error al consultar pedidos abiertos:', error);
+        return balance;
+    }
+}
+
+function renderNapaRedeem() {
+    $('napaRedeem').hidden = napasAvailable === 0;
+    $('napaRedeemQty').textContent = napasToRedeem;
+    const kept = napasAvailable - napasToRedeem;
+    $('napaRedeemHint').textContent = `Tienes ${napasAvailable} ${napasAvailable === 1 ? 'disponible' : 'disponibles'}`
+        + (kept > 0 ? ` · te guardamos ${kept} para otro pedido` : '');
+}
+
+$('napaRedeem').addEventListener('click', event => {
+    const button = event.target.closest('[data-redeem]');
+    if (!button) return;
+    const next = Math.min(napasAvailable, Math.max(0, napasToRedeem + Number(button.dataset.redeem)));
+    if (next !== napasToRedeem) bump($('napaRedeemQty'));
+    napasToRedeem = next;
+    renderNapaRedeem();
+});
 
 function computeOrder() {
     const deliveryMethod = $('tipoEntrega').value;
@@ -69,6 +105,7 @@ function setQty(product, value) {
     if (next !== quantities[product]) bump($(product));
     quantities[product] = next;
     $(product).textContent = next;
+    document.querySelector(`[data-card="${product}"]`).classList.toggle('is-selected', next > 0);
 }
 
 form.addEventListener('click', event => {
@@ -128,8 +165,12 @@ form.addEventListener('submit', async event => {
             deliveryMethod: order.deliveryMethod,
             address: direccion,
             slot: hora,
-            test: session.isTest
+            test: session.isTest,
+            creditsToRedeem: napasToRedeem
         }));
+        napasAvailable -= napasToRedeem;
+        napasToRedeem = napasAvailable;
+        renderNapaRedeem();
 
         const savedUser = storage.get('pachoncito_user') || {};
         storage.set('pachoncito_user', { ...savedUser, name: nombre, address: direccion || savedUser.address || '' });
@@ -153,3 +194,6 @@ form.addEventListener('submit', async event => {
 
 prefill();
 toggleDireccion();
+napasAvailable = await loadAvailableNapas();
+napasToRedeem = napasAvailable;
+renderNapaRedeem();
