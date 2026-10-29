@@ -18,6 +18,7 @@ import { mountEnvBanner, TEST_CUSTOMERS, TEST_PHONES_LABEL, USE_EMULATORS } from
 import { hydrateIcons, icon } from "./icons.js";
 import { completeOrder, normalizeOrder } from "./orders.js";
 import { clearTestData, seedTestData } from "./seeder.js";
+import { setStoreOpen, watchStore } from "./store.js";
 import { el, formatDate, formatEUR, normalizePhone, PRODUCT_NAMES, RATING_ASPECTS, showMessage, starsText, withBusy } from "./shared.js";
 import { closeDialog, initUI, toast } from "./ui.js";
 
@@ -268,7 +269,8 @@ function startListeners() {
         onSnapshot(query(collection(db, 'reviews'), orderBy('createdAt', 'desc'), limit(100)), snap => {
             reviews = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             renderReviews();
-        }, onError)
+        }, onError),
+        watchStore(db, renderStoreStatus, onError)
     ];
 
     ensureCostData(db)
@@ -288,6 +290,35 @@ function startListeners() {
             }));
         });
 }
+
+// ---------- Estado del obrador (abierto / descanso) ----------
+
+function renderStoreStatus(open) {
+    const toggle = $('storeOpenToggle');
+    toggle.checked = open;
+    toggle.disabled = false;
+    $('storeStatus').dataset.open = String(open);
+    $('storeStatusLabel').textContent = open ? 'abierto' : 'en descanso';
+    $('storeStatusHint').textContent = open
+        ? 'Los clientes pueden reservar.'
+        : 'La carta se ve, pero las reservas están en pausa.';
+}
+
+$('storeOpenToggle').addEventListener('change', async event => {
+    const toggle = event.target;
+    const open = toggle.checked;
+    toggle.disabled = true;
+    try {
+        await setStoreOpen(db, open);
+        toast(open ? 'Obrador abierto: ya se puede reservar.' : 'Obrador en descanso: reservas en pausa.', 'success');
+    } catch (error) {
+        console.error('Error al cambiar el estado del obrador:', error);
+        toggle.checked = !open;
+        toast('No se pudo cambiar el estado del obrador.', 'error');
+    } finally {
+        toggle.disabled = false;
+    }
+});
 
 function stopListeners() {
     unsubscribers.forEach(unsubscribe => unsubscribe());

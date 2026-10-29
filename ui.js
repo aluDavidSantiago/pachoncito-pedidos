@@ -76,9 +76,9 @@ export function initUI() {
     mountVersion();
 }
 
-// Indicador de versión: texto informativo al final de la tarjeta (o del panel), sin enlaces
+// Indicador de versión: texto informativo dentro del pie (o al final de la tarjeta / del panel si no hay pie), sin enlaces
 function mountVersion() {
-    const host = document.querySelector('.container, .admin-container') || document.body;
+    const host = document.querySelector('.site-footer') || document.querySelector('.container, .admin-container') || document.body;
     host.append(el('p', { className: 'app-version', text: `Pachoncito v${APP_VERSION}` }));
 }
 

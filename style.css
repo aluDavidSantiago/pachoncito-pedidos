@@ -1184,6 +1184,71 @@ input[type="radio"] {
     color: var(--success);
 }
 
+/* ---------- Obrador en descanso (settings/store) ---------- */
+
+.closed-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.875rem;
+    margin-bottom: 1.25rem;
+    padding: 1.125rem 1.125rem 1.125rem 1rem;
+    background:
+        radial-gradient(120% 140% at 0% 0%, var(--accent-soft), transparent 60%),
+        var(--surface-2);
+    border: 1px solid var(--accent-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm), inset 0 1px 0 var(--highlight);
+    animation: rise var(--dur-4) var(--ease-out) both;
+}
+
+.closed-banner[hidden] { display: none; }
+
+.closed-banner-icon {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--accent-border);
+    color: var(--terracotta);
+}
+
+.closed-banner-icon .icon { width: 1.375rem; height: 1.375rem; }
+
+.closed-banner-title {
+    margin: 0 0 0.25rem;
+    font-family: var(--font-serif);
+    font-size: var(--fs-lg);
+    font-weight: 600;
+    color: var(--text);
+}
+
+.closed-banner p {
+    margin: 0;
+    font-size: var(--fs-sm);
+    line-height: 1.45;
+    color: var(--text);
+    text-wrap: pretty;
+}
+
+.closed-banner .closed-banner-hint {
+    margin-top: 0.375rem;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+/* La carta sigue visible pero apagada: no invita a tocar lo que no funciona */
+#orderForm.is-closed .products-section,
+#orderForm.is-closed .napa-redeem {
+    opacity: 0.6;
+    filter: saturate(0.7);
+    transition: opacity var(--dur-3) var(--ease-out), filter var(--dur-3) var(--ease-out);
+}
+
+#orderForm.is-closed .counter button { cursor: not-allowed; }
+
 /* Pequeño latido al cambiar una cantidad o el total (script.js añade .bump) */
 .bump {
     display: inline-block;
@@ -2961,6 +3026,10 @@ details[open] > .spec-grid {
     pointer-events: none;
 }
 
+.site-footer > .app-version {
+    margin-top: 0.5rem;
+}
+
 .admin-container > .app-version {
     margin-top: 2rem;
     padding-bottom: env(safe-area-inset-bottom);
@@ -3078,3 +3147,83 @@ body.has-env-banner .top-nav {
         transition-duration: 1ms !important;
     }
 }
+
+/* ---------- Panel: estado del obrador (interruptor abierto / descanso) ---------- */
+
+.store-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem 1.125rem;
+    background: var(--success-soft);
+    border: 1px solid var(--success);
+    border-radius: var(--radius-md);
+    transition: background var(--dur-3) var(--ease-out), border-color var(--dur-3) var(--ease-out);
+}
+
+.store-status[data-open="false"] {
+    background: var(--accent-soft);
+    border-color: var(--accent-border);
+}
+
+.store-status-title {
+    margin: 0 0 0.125rem;
+    font-size: var(--fs-lg);
+    font-weight: 600;
+    color: var(--text);
+}
+
+.store-status[data-open="true"] #storeStatusLabel { color: var(--success); }
+.store-status[data-open="false"] #storeStatusLabel { color: var(--accent); }
+.store-status .hint { margin: 0; }
+
+.switch {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    min-width: var(--tap);
+    min-height: var(--tap);
+    align-items: center;
+    cursor: pointer;
+}
+
+.switch input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: inherit;
+}
+
+.switch-track {
+    position: relative;
+    width: 3.25rem;
+    height: 1.9rem;
+    border-radius: var(--radius-pill);
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    transition: background var(--dur-2) var(--ease-out);
+}
+
+.switch-thumb {
+    position: absolute;
+    top: 50%;
+    left: 0.15rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-50%);
+    transition: transform var(--dur-3) var(--ease-spring);
+}
+
+.switch input:checked + .switch-track { background: var(--success); border-color: var(--success); }
+.switch input:checked + .switch-track .switch-thumb { transform: translate(1.35rem, -50%); }
+.switch input:focus-visible + .switch-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch input:disabled { cursor: progress; }
+.switch input:disabled + .switch-track { opacity: 0.6; }

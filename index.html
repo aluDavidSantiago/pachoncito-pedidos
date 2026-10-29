@@ -15,7 +15,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Pachoncito">
     <title>Pachoncito | Pedidos</title>
-    <link rel="stylesheet" href="style.css?v=2.3.2">
+    <link rel="stylesheet" href="style.css?v=2.3.3">
 </head>
 <body>
     <div class="container">
@@ -43,6 +43,16 @@
 
         <div id="installSlot"></div>
 
+        <!-- Obrador en descanso (settings/store · open == false): la carta se ve, pero no se reserva (script.js) -->
+        <section class="closed-banner" id="closedBanner" role="status" aria-live="polite" hidden>
+            <span class="closed-banner-icon"><span data-icon="oven"></span></span>
+            <div>
+                <h2 class="closed-banner-title">El obrador descansa</h2>
+                <p>El obrador descansa temporalmente. Volvemos pronto con los mejores pandebonos recién horneados.</p>
+                <p class="closed-banner-hint">Puedes echar un vistazo a la carta; las reservas se abrirán de nuevo aquí mismo.</p>
+            </div>
+        </section>
+
         <form id="orderForm" novalidate>
             <div class="field">
                 <label for="nombre">Nombre y Apellidos</label>
@@ -63,8 +73,8 @@
                         <div class="product-photo" aria-hidden="true"><span data-icon="bread"></span></div>
                         <div class="product-info">
                             <h3>Clásico</h3>
-[línea retirada: dato privado del obrador]
-[línea retirada: dato privado del obrador]
+                            <span class="product-sub">Receta tradicional de la casa</span>
+                            <span class="product-tags"><span>Selección de quesos artesanos</span><span>Corteza dorada</span></span>
                             <span class="price" data-price="clasico"></span>
                         </div>
                     </div>
@@ -82,7 +92,7 @@
                         <div class="product-info">
                             <h3>Con Bocadillo</h3>
                             <span class="product-sub">Relleno de guayaba</span>
-                            <span class="product-tags"><span>Bocadillo de guayaba</span><span>Centro fundente</span></span>
+                            <span class="product-tags"><span>Corazón dulce de la casa</span><span>Centro fundente</span></span>
                             <span class="price" data-price="bocadillo"></span>
                         </div>
                     </div>
@@ -175,7 +185,7 @@
 
             <div class="summary">
                 <p class="summary-total">Total a pagar <strong id="totalPrice">0,00 €</strong></p>
-                <p class="payment-note"><span data-icon="cash"></span>Pago solo en efectivo al recoger o recibir el pedido</p>
+                <p class="payment-note"><span data-icon="cash"></span>Pago en efectivo o Bizum al recoger o recibir el pedido</p>
                 <button type="submit" class="btn btn-primary" id="submitBtn">Reservar para el domingo</button>
             </div>
         </form>
@@ -192,6 +202,6 @@
         </footer>
     </div>
 
-    <script type="module" src="script.js?v=2.3.2"></script>
+    <script type="module" src="script.js?v=2.3.3"></script>
 </body>
 </html>

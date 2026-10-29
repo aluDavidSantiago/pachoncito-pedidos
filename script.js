@@ -7,6 +7,7 @@ import { buildOrder, normalizeOrder, priceOrder } from "./orders.js";
 import { mountInstallPrompt, registerServiceWorker } from "./pwa.js";
 import { playReward, playSuccess, playTap } from "./sound.js";
 import { requireCustomer } from "./session.js";
+import { watchStore } from "./store.js";
 import { bump, initUI, mountTopNav, nudge } from "./ui.js";
 import { el, formatEUR, MAX_QTY, NAPA_EVERY_CENTS, PRICES_CENTS, showMessage, storage, validateMobile } from "./shared.js";
 
@@ -29,6 +30,8 @@ const quantities = { clasico: 0, bocadillo: 0 };
 const OPEN_STATUSES = ['pending', 'preparing', 'ready'];
 let napasAvailable = 0;
 let napasToRedeem = 0;
+let storeOpen = true;      // settings/store: el obrador puede estar en descanso
+let phoneBlocked = false;  // cuenta antigua con un teléfono que ya no es válido
 
 mountTopNav(profile);
 mountInstallPrompt($('installSlot'));
@@ -143,6 +146,21 @@ function prefill() {
     $('direccion').value = savedUser.address || profile.address || '';
 }
 
+// El botón de reservar solo se activa con el obrador abierto y un teléfono válido
+function syncSubmit() {
+    submitBtn.disabled = !storeOpen || phoneBlocked;
+    submitBtn.textContent = storeOpen ? SUBMIT_LABEL : 'Reservas en pausa';
+}
+
+// Obrador en descanso: la carta se puede ver, pero contadores y reserva quedan desactivados
+function renderStore(open) {
+    storeOpen = open;
+    $('closedBanner').hidden = open;
+    form.classList.toggle('is-closed', !open);
+    form.querySelectorAll('.counter button, #tipoEntrega, #hora, #direccion').forEach(control => { control.disabled = !open; });
+    syncSubmit();
+}
+
 function fail(text, field) {
     showMessage(message, text, 'error');
     if (field) field.focus();
@@ -159,6 +177,7 @@ form.addEventListener('submit', async event => {
     const order = computeOrder();
 
     if (nombre.length < 2) return fail('Escribe tu nombre y apellidos.', $('nombre'));
+    if (!storeOpen) return fail('El obrador descansa ahora mismo: no hay reservas activas. ¡Volvemos pronto!');
     if (quantities.clasico + quantities.bocadillo === 0) return fail('Selecciona al menos un pandebono para tu pedido.');
     if (order.deliveryMethod === 'domicilio' && direccion.length < 5) return fail('Introduce tu dirección exacta en Premià de Mar.', $('direccion'));
     if (!hora) return fail('Selecciona una hora de entrega.', $('hora'));
@@ -196,10 +215,11 @@ form.addEventListener('submit', async event => {
         message.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } catch (error) {
         console.error('Error al guardar el pedido:', error);
-        fail('No hemos podido guardar tu pedido. Revisa la conexión y vuelve a intentarlo; si sigue fallando, escríbenos.');
+        fail(!storeOpen
+            ? 'El obrador acaba de entrar en descanso: no hay reservas activas. ¡Volvemos pronto!'
+            : 'No hemos podido guardar tu pedido. Revisa la conexión y vuelve a intentarlo; si sigue fallando, escríbenos.');
     } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = SUBMIT_LABEL;
+        syncSubmit();
     }
 });
 
@@ -209,9 +229,11 @@ toggleDireccion();
 // Cuentas anteriores a la validación estricta: si su teléfono no es un móvil español real, no se puede reservar
 // (las reglas también lo rechazan). Se avisa antes de que rellene el pedido.
 if (!session.isTest && !validateMobile(profile.phone).phone) {
-    submitBtn.disabled = true;
+    phoneBlocked = true;
+    syncSubmit();
     showMessage(message, 'El teléfono vinculado a tu cuenta no es un móvil español válido. Escríbenos por Instagram para corregirlo y poder reservar.', 'error');
 }
+watchStore(db, renderStore);
 napasAvailable = await loadAvailableNapas();
 napasToRedeem = napasAvailable;
 renderNapaRedeem();

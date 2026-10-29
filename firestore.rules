@@ -19,6 +19,7 @@ rules_version = '2';
 //   customers/{teléfono}     Expedientes antiguos (antes de las cuentas de Google): solo el obrador.
 //   ingredients/{id}         Materias primas: proveedor, precio, precio anterior y receta por tanda (solo el obrador).
 //   settings/costs           Tamaño de tanda y otros costes (solo el obrador).
+//   settings/store           { open } Obrador abierto o en descanso. Lo lee cualquiera; con open == false no se aceptan pedidos.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -111,7 +112,14 @@ service cloud.firestore {
     }
 
     match /settings/{settingId} {
+      allow get: if settingId == 'store';
       allow read, write: if isAdmin();
+    }
+
+    // Obrador abierto (sin documento settings/store, o sin el campo, también cuenta como abierto)
+    function storeOpen() {
+      return !exists(/databases/$(database)/documents/settings/store)
+        || get(/databases/$(database)/documents/settings/store).data.get('open', true) != false;
     }
 
     // ---------- Clientes ----------
@@ -259,6 +267,7 @@ service cloud.firestore {
       // Cliente: a su nombre y con SU teléfono vinculado (un teléfono liberado deja de valer)
       allow create: if signedIn()
         && validNewOrder(request.resource.data)
+        && storeOpen()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.test == isAnonymous()
         && request.resource.data.phone == get(customerPath(request.auth.uid)).data.phone

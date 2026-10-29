@@ -34,6 +34,7 @@ Plataforma web desarrollada para la gestión, procesamiento y control de pedidos
 | `session.js` | Guardia de navegación y sesión del cliente |
 | `env.js` | Entorno (local/producción), modo pruebas, teléfonos y clientes de prueba |
 | `shared.js` | Precios, regla de ñapas y utilidades comunes |
+| `store.js` | Estado del obrador (abierto / en descanso) en `settings/store`: interruptor del panel y aviso en la carta |
 | `orders.js` | Construcción y entrega de pedidos (la usan web, panel y generador) |
 | `seeder.js` | Generador de datos de prueba del panel |
 | `pwa.js` + `sw.js` + `manifest.json` + `icons/` | App instalable (PWA) y funcionamiento básico sin conexión |
@@ -63,8 +64,7 @@ Plataforma web desarrollada para la gestión, procesamiento y control de pedidos
 ## Producción y costes
 
 * **1 tanda = 8 pandebonos** (`UNITS_PER_BATCH` en `admin-costs.js`). El panel separa **Pendientes de hornear** (pedidos pendientes o en preparación) y **Horneados** (listos o entregados), y expresa lo pendiente en tandas completas de 8.
-[línea retirada: dato privado del obrador]
-* Pago **solo en efectivo** al recoger o recibir el pedido.
+* Pago en **efectivo o Bizum** al recoger o recibir el pedido.
 
 ## Antifraude: un teléfono, una cuenta
 

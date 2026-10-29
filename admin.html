@@ -10,7 +10,7 @@
     <link rel="icon" href="icons/favicon-light-48.png" media="(prefers-color-scheme: light)">
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     <title>Pachoncito | Obrador</title>
-    <link rel="stylesheet" href="style.css?v=2.3.2">
+    <link rel="stylesheet" href="style.css?v=2.3.3">
 </head>
 <body class="admin-page">
     <div class="admin-container">
@@ -61,6 +61,19 @@
 
         <main id="dashboard" hidden>
             <p id="adminMessage" class="form-message" role="status" aria-live="polite" hidden></p>
+
+            <!-- Estado del obrador: abierto o en descanso (settings/store); la carta lo refleja al instante -->
+            <section class="store-status" id="storeStatus" data-open="true" aria-labelledby="storeStatusTitle">
+                <div class="store-status-text">
+                    <h2 id="storeStatusTitle" class="store-status-title">Obrador <span id="storeStatusLabel">abierto</span></h2>
+                    <p class="hint" id="storeStatusHint">Los clientes pueden reservar.</p>
+                </div>
+                <label class="switch">
+                    <span class="visually-hidden">Obrador abierto a reservas</span>
+                    <input type="checkbox" role="switch" id="storeOpenToggle" checked disabled>
+                    <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+                </label>
+            </section>
 
             <!-- Domingo de entrega y resumen de producción -->
             <section class="dash-section" aria-labelledby="productionTitle">
@@ -209,6 +222,6 @@
         </div>
     </dialog>
 
-    <script type="module" src="admin.js?v=2.3.2"></script>
+    <script type="module" src="admin.js?v=2.3.3"></script>
 </body>
 </html>

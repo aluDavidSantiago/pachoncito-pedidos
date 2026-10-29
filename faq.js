@@ -58,7 +58,7 @@ function buildFaqDialog() {
                 )
             ),
             faqItem('cash', '¿Cómo se paga?',
-                el('p', {}, 'El pago es ', el('strong', { text: 'solo en efectivo' }), ', en el momento de la recogida o de la entrega a domicilio. No pedimos datos de tarjeta ni pagos por adelantado.')
+                el('p', {}, 'Puedes pagar ', el('strong', { text: 'en efectivo o por Bizum' }), ', en el momento de la recogida o de la entrega a domicilio. No pedimos datos de tarjeta ni pagos por adelantado.')
             ),
             faqItem('gift', '¿Cómo uso mis ñapas acumuladas?',
                 el('p', { text: 'Al hacer tu pedido eliges cuántas de tus ñapas acumuladas (por invitar amigos o valorar) quieres canjear: todas, algunas o ninguna. Las que no uses se quedan guardadas en tu cuenta para el siguiente pedido.' })
