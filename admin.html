@@ -10,7 +10,7 @@
     <link rel="icon" href="icons/favicon-light-48.png" media="(prefers-color-scheme: light)">
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     <title>Pachoncito | Obrador</title>
-    <link rel="stylesheet" href="style.css?v=2.3.3">
+    <link rel="stylesheet" href="style.css?v=2.3.4">
 </head>
 <body class="admin-page">
     <div class="admin-container">
@@ -149,6 +149,11 @@
             <section class="dash-section" aria-labelledby="costsTitle">
                 <div class="dash-section-head">
                     <h2 id="costsTitle" class="section-title">Materias primas y costes</h2>
+                    <!-- Catálogo privado (receta, proveedores, precios): se carga desde un archivo del obrador, nunca desde la web -->
+                    <label class="btn btn-small file-button">
+                        <span data-icon="layers"></span>Importar catálogo
+                        <input type="file" id="catalogFile" accept="application/json,.json" class="visually-hidden">
+                    </label>
                 </div>
                 <div id="costMonitor"><p class="loading-state">Cargando costes…</p></div>
             </section>
@@ -222,6 +227,6 @@
         </div>
     </dialog>
 
-    <script type="module" src="admin.js?v=2.3.3"></script>
+    <script type="module" src="admin.js?v=2.3.4"></script>
 </body>
 </html>

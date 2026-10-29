@@ -10,7 +10,7 @@ import {
     enrollBiometric, forgetBiometric, getEnrollment, isUnlocked, lockPanel, markUnlocked, verifyBiometric
 } from "./admin-biometric.js";
 import {
-    ensureCostData, parseEuros, UNITS_PER_BATCH, renderCostMonitor, renderShoppingList, unitCosts,
+    ensureCostData, importCatalog, parseEuros, UNITS_PER_BATCH, renderCostMonitor, renderShoppingList, unitCosts,
     updateCostSettings, updateIngredientSpec, updatePackPrice, watchCostData
 } from "./admin-cost-monitor.js";
 import { adminAuth, adminDb as db } from "./admin-firebase.js";
@@ -664,6 +664,22 @@ const costHandlers = {
         }
     }
 };
+
+$('catalogFile').addEventListener('change', async event => {
+    const input = event.target;
+    const file = input.files?.[0];
+    input.value = ''; // permite volver a elegir el mismo archivo
+    if (!file) return;
+    try {
+        const { created, completed, total } = await importCatalog(db, await file.text());
+        toast(created || completed
+            ? `Catálogo importado: ${created} ingredientes nuevos y ${completed} completados (de ${total}).`
+            : 'El catálogo ya estaba al día: no había nada que importar.', 'success');
+    } catch (error) {
+        console.error('Error al importar el catálogo:', error);
+        toast(error.message || 'No se pudo importar el catálogo.', 'error');
+    }
+});
 
 function renderCosts() {
     if (costData) renderCostMonitor($('costMonitor'), costData, costHandlers);

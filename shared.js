@@ -2,7 +2,7 @@
 // IMPORTANTE: los precios y la regla de ñapas también están en firestore.rules; si cambian aquí, cámbialos allí.
 
 // Versión visible en el pie de todas las páginas (ui.js · mountVersion). Al cambiarla, sube también CACHE_VERSION en sw.js.
-export const APP_VERSION = '2.3.3';
+export const APP_VERSION = '2.3.4';
 
 export const PRICES_CENTS = { clasico: 150, bocadillo: 170 };
 export const DELIVERY_CENTS = 100;

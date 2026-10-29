@@ -1,13 +1,14 @@
 // Monitor de costes del obrador: materias primas con su proveedor, precio actual frente al anterior
 // y margen por pandebono. Este archivo es público (GitHub Pages), así que NO contiene datos: ingredientes,
 // proveedores, precios y cantidades viven solo en Firestore, y las reglas solo dejan leerlos al obrador.
+// Para restaurarlos, el obrador importa desde el panel su archivo privado (catalogo-pachoncito.json).
 //   ingredients/{id}  → formato del envase, precio, precio anterior y cantidad usada
 //   settings/costs    → otros costes (envase, bolsas, luz)
 //
 // 1 tanda = 8 pandebonos (UNITS_PER_BATCH). Cada ingrediente se usa por TANDA de masa (scope 'batch',
 // campo usagePerBatch) o por cada pandebono de BOCADILLO (scope 'bocadillo', campo usagePerUnit).
 import {
-    collection, doc, getDoc, onSnapshot, serverTimestamp, setDoc, updateDoc
+    collection, doc, getDoc, getDocs, onSnapshot, serverTimestamp, setDoc, updateDoc, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { icon } from "./icons.js";
 import { el, PRICES_CENTS, PRODUCT_NAMES } from "./shared.js";
@@ -32,6 +33,54 @@ export async function ensureCostData(db) {
     const settingsRef = doc(db, 'settings', 'costs');
     if ((await getDoc(settingsRef)).exists()) return;
     await setDoc(settingsRef, { ...DEFAULT_SETTINGS, updatedAt: serverTimestamp() });
+}
+
+// Importa el catálogo privado del obrador ({ ingredients: [...], settings: { otherPerBatchCents } }).
+// Crea los ingredientes que falten y completa los campos vacíos de los existentes: lo editado en el panel se respeta.
+const SPEC_FIELDS = ['name', 'supplier', 'url', 'packAmount', 'unit', 'packPriceCents', 'usagePerBatch', 'usagePerUnit'];
+
+export async function importCatalog(db, text) {
+    let catalog;
+    try { catalog = JSON.parse(text); } catch { throw new Error('El archivo no es un JSON válido.'); }
+    const list = Array.isArray(catalog?.ingredients) ? catalog.ingredients : null;
+    const valid = list?.every(ing => typeof ing.id === 'string' && /^[a-z0-9_-]{1,40}$/i.test(ing.id)
+        && typeof ing.name === 'string' && ing.packAmount > 0 && Number.isInteger(ing.packPriceCents) && UNIT_LABEL[ing.unit]);
+    if (!list?.length || !valid) throw new Error('El archivo no tiene el formato del catálogo de Pachoncito.');
+
+    const existing = new Map((await getDocs(collection(db, 'ingredients'))).docs.map(d => [d.id, d.data()]));
+    const batch = writeBatch(db);
+    let created = 0;
+    let completed = 0;
+    list.forEach((ing, order) => {
+        const ref = doc(db, 'ingredients', ing.id);
+        const spec = Object.fromEntries(SPEC_FIELDS.filter(key => ing[key] !== undefined).map(key => [key, ing[key]]));
+        const current = existing.get(ing.id);
+        if (!current) {
+            created++;
+            batch.set(ref, {
+                ...spec, order, scope: ing.scope || 'batch',
+                previousPackPriceCents: null, estimated: false, usageEstimated: false,
+                priceUpdatedAt: serverTimestamp()
+            });
+            return;
+        }
+        const missing = Object.fromEntries(Object.entries(spec).filter(([key]) => current[key] == null));
+        if (current.scope == null) missing.scope = ing.scope || 'batch';
+        if (Object.keys(missing).length) {
+            completed++;
+            batch.update(ref, missing);
+        }
+    });
+    const other = catalog.settings?.otherPerBatchCents;
+    if (Number.isInteger(other) && other >= 0) {
+        const settingsRef = doc(db, 'settings', 'costs');
+        const settings = (await getDoc(settingsRef)).data();
+        if (!settings?.otherPerBatchCents) {
+            batch.set(settingsRef, { unitsPerBatch: UNITS_PER_BATCH, otherPerBatchCents: other, updatedAt: serverTimestamp() }, { merge: true });
+        }
+    }
+    await batch.commit();
+    return { created, completed, total: list.length };
 }
 
 export function watchCostData(db, onChange, onError) {
@@ -189,6 +238,24 @@ function ingredientCard(ing, handlers) {
     );
 }
 
+// Receta a la vista (solo en el panel): cantidades por tanda de masa y por cada bocadillo
+function recipePanel(ingredients) {
+    const row = ing => el('li', { className: 'recipe-row' },
+        el('span', { text: ing.name }),
+        el('strong', { text: usageOf(ing) > 0 ? `${usageOf(ing)} ${UNIT_LABEL[ing.unit] || ing.unit}` : '—' })
+    );
+    const dough = ingredients.filter(ing => !isPerBocadillo(ing));
+    const filling = ingredients.filter(isPerBocadillo);
+    return el('div', { className: 'recipe-panel' },
+        el('h3', {}, icon('clipboard'), `Receta por tanda (${UNITS_PER_BATCH} pandebonos)`),
+        el('ul', { className: 'recipe-list' }, dough.map(row)),
+        filling.length ? [
+            el('h4', { className: 'recipe-subtitle', text: 'Por cada pandebono con bocadillo' }),
+            el('ul', { className: 'recipe-list' }, filling.map(row))
+        ] : null
+    );
+}
+
 function marginRow(label, priceCents, costCents) {
     const margin = priceCents - costCents;
     const pct = priceCents ? Math.round((margin / priceCents) * 100) : 0;
@@ -204,7 +271,7 @@ export function renderCostMonitor(container, data, handlers) {
     if (!ingredients.length) {
         container.replaceChildren(el('p', {
             className: 'empty-state',
-            text: 'No hay ingredientes en la base de datos. Añádelos en Firestore (colección ingredients): por seguridad, la receta ya no viaja en el código de la web.'
+            text: 'No hay ingredientes en la base de datos. Pulsa «Importar catálogo» y elige tu archivo privado (catalogo-pachoncito.json): por seguridad, la receta no viaja en el código de la web.'
         }));
         return;
     }
@@ -223,6 +290,7 @@ export function renderCostMonitor(container, data, handlers) {
                 ? el('p', { className: 'impact-line is-warning', text: `Coste incompleto: falta la cantidad usada de ${costs.missing.join(', ')}.` })
                 : null
         ),
+        recipePanel(ingredients),
         el('div', { className: 'cost-grid' }, ingredients.map(ing => ingredientCard(ing, handlers))),
         el('details', { className: 'recipe-spec other-costs' },
             el('summary', {}, 'Otros costes por tanda', icon('chevron', 'icon chevron')),

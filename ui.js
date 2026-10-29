@@ -95,9 +95,14 @@ function blockZoom() {
 }
 
 // Barra superior: nombre y ñapas del cliente. En la página de pedido, «Hacer pedido» desplaza a los productos.
+// Se puede volver a llamar para repintar el saldo: los eventos solo se enlazan la primera vez.
+let topNavBound = false;
+
 export function mountTopNav(profile) {
     document.querySelectorAll('[data-nav-name]').forEach(node => { node.textContent = profile.name.split(' ')[0]; });
     document.querySelectorAll('[data-nav-napas]').forEach(node => { node.textContent = profile.napaCredits || 0; });
+    if (topNavBound) return;
+    topNavBound = true;
     mountSoundToggle();
     const target = document.getElementById('pedido');
     const cta = document.querySelector('[data-nav-order]');

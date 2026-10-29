@@ -1,5 +1,5 @@
 // Área del cliente recurrente: saldo de ñapas, historial de pedidos, código de invitación e instalación de la app.
-import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, doc, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { mountEnvBanner } from "./env.js";
 import { mountFaq } from "./faq.js";
 import { db } from "./firebase.js";
@@ -8,7 +8,7 @@ import { normalizeOrder } from "./orders.js";
 import { mountInstallPrompt, registerServiceWorker } from "./pwa.js";
 import { endSession, requireCustomer } from "./session.js";
 import { el, formatDate, formatEUR, PRODUCT_NAMES, showMessage } from "./shared.js";
-import { initUI, mountTopNav } from "./ui.js";
+import { initUI, mountTopNav, toast } from "./ui.js";
 
 mountEnvBanner();
 registerServiceWorker();
@@ -33,9 +33,13 @@ $('accountPhone').textContent = [
     session.isTest ? '🧪 Cuenta de prueba' : profile.email,
     `Teléfono ${profile.phone}${profile.phoneVerified ? ' (confirmado)' : ' (se confirma en tu primera entrega)'}`
 ].filter(Boolean).join(' · ');
-$('statNapas').textContent = profile.napaCredits || 0;
-$('statOrders').textContent = profile.completedOrders || 0;
-$('statReferrals').textContent = profile.referralsCount || 0;
+// Saldo y contadores: se repintan solos cuando el obrador entrega un pedido o suma ñapas
+function renderStats(data) {
+    $('statNapas').textContent = data.napaCredits || 0;
+    $('statOrders').textContent = data.completedOrders || 0;
+    $('statReferrals').textContent = data.referralsCount || 0;
+}
+renderStats(profile);
 $('referralCode').textContent = profile.referralCode || '—';
 
 mountInstallPrompt($('installSlot'));
@@ -101,20 +105,41 @@ function redeemedText(order) {
     return `${n} ${n === 1 ? 'ñapa acumulada' : 'ñapas acumuladas'} ${verb}`;
 }
 
-async function loadOrders() {
+// Historial en tiempo real: cuando el obrador cambia el estado (Listo, Entregado…) se ve al instante, sin recargar
+let lastStatus = new Map(); // id → estado, para resaltar el pedido que acaba de cambiar
+
+function watchOrders() {
     const list = $('ordersList');
-    try {
-        // Sin orderBy en la consulta para no necesitar índice compuesto: se ordena aquí
-        const snap = await getDocs(query(collection(db, 'orders'), where('uid', '==', session.uid)));
+    // Sin orderBy en la consulta para no necesitar índice compuesto: se ordena aquí
+    return onSnapshot(query(collection(db, 'orders'), where('uid', '==', session.uid)), snap => {
         const orders = snap.docs.map(normalizeOrder)
             .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+        const changed = orders.filter(order => lastStatus.has(order.id) && lastStatus.get(order.id) !== order.status);
+        lastStatus = new Map(orders.map(order => [order.id, order.status]));
         list.replaceChildren(...(orders.length
-            ? orders.map(orderItem)
+            ? orders.map(order => {
+                const card = orderItem(order);
+                if (changed.includes(order)) card.classList.add('is-updated');
+                return card;
+            })
             : [el('p', { className: 'empty-state', text: 'Todavía no has hecho ningún pedido.' })]));
-    } catch (error) {
+        if (changed.length) {
+            const [statusText] = STATUS[changed[0].status] || STATUS.pending;
+            toast(`Tu pedido ha cambiado: ${statusText}.`, 'success');
+        }
+    }, error => {
         console.error('Error al cargar el historial:', error);
         list.replaceChildren(el('p', { className: 'empty-state', text: 'No se pudo cargar tu historial.' }));
-    }
+    });
+}
+
+function watchProfile() {
+    return onSnapshot(doc(db, 'customers', session.uid), snap => {
+        const data = snap.data();
+        if (!data) return;
+        renderStats(data);
+        mountTopNav({ ...profile, ...data });
+    }, error => console.error('Error al escuchar tu cuenta:', error));
 }
 
 $('logoutBtn').addEventListener('click', async () => {
@@ -122,4 +147,5 @@ $('logoutBtn').addEventListener('click', async () => {
     location.replace('acceso.html');
 });
 
-loadOrders();
+watchOrders();
+watchProfile();
