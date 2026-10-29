@@ -103,7 +103,7 @@ flowchart TD
 | Cabecera de la carta | Nombre y saldo de ñapas | `customers/{uid}` | `allow get: if isOwner(uid)` |
 | Mi cuenta | Ñapas, entregas, invitados, teléfono (confirmado o no), código | `customers/{uid}` | Solo lectura para el cliente (salvo nombre y dirección) |
 | Historial | Sus pedidos con estado | `orders` filtrado por `uid` | `allow read: if resource.data.uid == request.auth.uid` |
-| Reseñas | Formulario + reseñas anónimas | `reviews` + `reviewAuthors` | Compra previa del producto, una por producto, `test` veraz |
+| Reseñas | Formulario + reseñas anónimas | `reviews` + `reviewAuthors` | Pedido propio entregado con ese sabor, una reseña (y 1 ñapa) por pedido, `test` veraz |
 
 ---
 

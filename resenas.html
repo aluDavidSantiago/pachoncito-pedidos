@@ -53,7 +53,7 @@
                 <h2 id="rateTitle">Valora tu pedido</h2>
 
                 <div class="alert-box is-reward">
-                    <strong>Tu opinión tiene premio.</strong> Por tu primera valoración te regalamos una ñapa en tu próximo pedido (una sola, valores uno o los dos sabores).
+                    <strong>Tu opinión tiene premio.</strong> Por cada pedido entregado que valores te regalamos una ñapa para el siguiente.
                 </div>
 
                 <p class="section-desc">
@@ -64,6 +64,12 @@
                 <!-- La sesión la garantiza el auth wall (acceso.html) -->
                 <form id="ratingForm" class="form-section" novalidate>
                     <p class="signed-in" id="signedInAs"></p>
+
+                    <!-- Pedidos entregados sin valorar: se generan en resenas.js -->
+                    <fieldset class="choice-cards" id="orderChoices">
+                        <legend class="label">¿Qué pedido quieres valorar?</legend>
+                        <p class="loading-state">Cargando tus pedidos…</p>
+                    </fieldset>
 
                     <fieldset class="choice-cards">
                         <legend class="label">¿Qué pandebono quieres valorar?</legend>

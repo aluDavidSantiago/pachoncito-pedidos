@@ -1,39 +1,19 @@
 // Monitor de costes del obrador: materias primas con su proveedor, precio actual frente al anterior
-// y margen por pandebono. Los datos viven en Firestore y solo los lee/escribe el obrador:
+// y margen por pandebono. Este archivo es público (GitHub Pages), así que NO contiene datos: ingredientes,
+// proveedores, precios y cantidades viven solo en Firestore, y las reglas solo dejan leerlos al obrador.
 //   ingredients/{id}  → formato del envase, precio, precio anterior y cantidad usada
-//   settings/costs    → otros costes (envase, bolsas, luz) y versión del catálogo
+//   settings/costs    → otros costes (envase, bolsas, luz)
 //
 // 1 tanda = 8 pandebonos (UNITS_PER_BATCH). Cada ingrediente se usa por TANDA de masa (scope 'batch',
-// campo usagePerBatch) o por cada pandebono de BOCADILLO (scope 'bocadillo', campo usagePerUnit: la guayaba).
+// campo usagePerBatch) o por cada pandebono de BOCADILLO (scope 'bocadillo', campo usagePerUnit).
 import {
-    collection, deleteField, doc, getDoc, getDocs, onSnapshot, serverTimestamp, updateDoc, writeBatch
+    collection, doc, getDoc, onSnapshot, serverTimestamp, setDoc, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { icon } from "./icons.js";
 import { el, PRICES_CENTS, PRODUCT_NAMES } from "./shared.js";
 
-// Sube este número cuando cambie el catálogo por defecto: ensureCostData() añadirá lo nuevo sin pisar lo editado.
-const CATALOG_VERSION = 3;
-
-// Formatos y precios consultados en la ficha de cada proveedor el 27/10/2026.
-[línea retirada: dato privado del obrador]
-[línea retirada: dato privado del obrador]
-const DEFAULT_INGREDIENTS = [
-[línea retirada: dato privado del obrador]
-[línea retirada: dato privado del obrador]
-[línea retirada: dato privado del obrador]
-[línea retirada: dato privado del obrador]
-[línea retirada: dato privado del obrador]
-[línea retirada: dato privado del obrador]
-[línea retirada: dato privado del obrador]
-[línea retirada: dato privado del obrador]
-    { id: 'guayaba', name: 'Pasta de guayaba (bocadillo)', supplier: 'Compra en tienda', url: null, packAmount: 1000, unit: 'g', packPriceCents: 500, scope: 'bocadillo', usagePerUnit: 15 }
-];
-
-// 1 tanda = 8 pandebonos. Envase, bolsas y luz: 0,37 € por tanda (los 0,74 € que se usaban para 16)
 export const UNITS_PER_BATCH = 8;
-const DEFAULT_SETTINGS = { unitsPerBatch: UNITS_PER_BATCH, otherPerBatchCents: 37 };
-// Versión del catálogo a partir de la cual las cantidades guardadas ya son por tanda de 8
-const RECIPE_V8 = 3;
+const DEFAULT_SETTINGS = { unitsPerBatch: UNITS_PER_BATCH, otherPerBatchCents: 0 };
 
 const UNIT_LABEL = { u: 'u', g: 'g', ml: 'ml' };
 const eur = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
@@ -47,58 +27,11 @@ const isComplete = ing => usageOf(ing) > 0 && ing.packAmount > 0 && Number.isFin
 
 // ---------- Datos ----------
 
-// Crea el catálogo la primera vez y, en versiones nuevas, añade lo que falte sin pisar lo editado
+// Solo crea settings/costs si falta (para poder guardar «otros costes»); el catálogo se gestiona en Firestore
 export async function ensureCostData(db) {
     const settingsRef = doc(db, 'settings', 'costs');
-    const [ingredientsSnap, settingsSnap] = await Promise.all([getDocs(collection(db, 'ingredients')), getDoc(settingsRef)]);
-    const settings = settingsSnap.exists() ? settingsSnap.data() : null;
-    if ((settings?.catalogVersion || 0) >= CATALOG_VERSION && !ingredientsSnap.empty) return;
-
-    const existing = new Map(ingredientsSnap.docs.map(d => [d.id, d.data()]));
-    const batch = writeBatch(db);
-
-    DEFAULT_INGREDIENTS.forEach(({ id, ...data }, order) => {
-        const ref = doc(db, 'ingredients', id);
-        const current = existing.get(id);
-        if (!current) {
-            batch.set(ref, {
-                ...data,
-                order,
-                scope: data.scope || 'batch',
-                previousPackPriceCents: null,
-                usageEstimated: Boolean(data.usageEstimated),
-                estimated: false,
-                priceUpdatedAt: serverTimestamp()
-            });
-            return;
-        }
-        const patch = { order, scope: current.scope || data.scope || 'batch' };
-        if (data.usagePerBatch != null && (settings?.catalogVersion || 0) < RECIPE_V8) {
-[línea retirada: dato privado del obrador]
-            patch.usagePerBatch = data.usagePerBatch;
-            patch.usageEstimated = false;
-        } else if (data.usagePerBatch != null && current.usagePerBatch == null) {
-            // Solo se completan cantidades que seguían vacías: lo que el obrador haya escrito se respeta
-            patch.usagePerBatch = data.usagePerBatch;
-            patch.usageEstimated = Boolean(data.usageEstimated);
-        }
-[línea retirada: dato privado del obrador]
-        batch.update(ref, patch);
-    });
-
-    if (settings) {
-        // fillingPerUnitCents (relleno fijo) queda sustituido por el ingrediente «guayaba»
-        const patch = { catalogVersion: CATALOG_VERSION, fillingPerUnitCents: deleteField(), updatedAt: serverTimestamp() };
-        if ((settings.catalogVersion || 0) < RECIPE_V8) {
-            const oldUnits = settings.unitsPerBatch || 16;
-            patch.unitsPerBatch = UNITS_PER_BATCH;
-            patch.otherPerBatchCents = Math.round((settings.otherPerBatchCents ?? 74) * UNITS_PER_BATCH / oldUnits);
-        }
-        batch.update(settingsRef, patch);
-    } else {
-        batch.set(settingsRef, { ...DEFAULT_SETTINGS, catalogVersion: CATALOG_VERSION, updatedAt: serverTimestamp() });
-    }
-    await batch.commit();
+    if ((await getDoc(settingsRef)).exists()) return;
+    await setDoc(settingsRef, { ...DEFAULT_SETTINGS, updatedAt: serverTimestamp() });
 }
 
 export function watchCostData(db, onChange, onError) {
@@ -268,6 +201,13 @@ function marginRow(label, priceCents, costCents) {
 
 export function renderCostMonitor(container, data, handlers) {
     const { ingredients, settings } = data;
+    if (!ingredients.length) {
+        container.replaceChildren(el('p', {
+            className: 'empty-state',
+            text: 'No hay ingredientes en la base de datos. Añádelos en Firestore (colección ingredients): por seguridad, la receta ya no viaja en el código de la web.'
+        }));
+        return;
+    }
     const costs = unitCosts(data);
     const otherInput = el('input', { type: 'number', inputmode: 'decimal', step: '0.01', min: '0', value: ((settings.otherPerBatchCents || 0) / 100).toFixed(2), 'aria-label': 'Otros costes por tanda' });
 

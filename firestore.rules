@@ -14,7 +14,8 @@ rules_version = '2';
 //   referralCodes/{código}   Código de invitación de cada cliente → su UID.
 //   orders/{id}              El cliente crea pedidos a su nombre y con su teléfono vinculado; lee los suyos.
 //                            creditsToRedeem (opcional): ñapas acumuladas que elige canjear en ese pedido.
-//   reviews/{uid_producto}   Públicas y anónimas. Una por cliente y producto, solo con compra entregada.
+//   reviews/{idPedido}       Públicas y anónimas. Una por pedido entregado (el cliente elige qué sabor valora)
+//                            y cada una da 1 ñapa. Las antiguas (uid_producto) y las de prueba (seed_*) se conservan.
 //   reviewAuthors/{id}       Privado. Vincula cada reseña con su autor (solo lo ve el obrador).
 //   customers/{teléfono}     Expedientes antiguos (antes de las cuentas de Google): solo el obrador.
 //   ingredients/{id}         Materias primas: proveedor, precio, precio anterior y receta por tanda (solo el obrador).
@@ -165,22 +166,22 @@ service cloud.firestore {
       return /databases/$(database)/documents/reviews/$(id);
     }
 
-    // Reseña nueva de este cliente creada en el mismo lote
-    function createsReview(uid) {
-      return (!exists(reviewPath(uid + '_clasico')) && existsAfter(reviewPath(uid + '_clasico')))
-        || (!exists(reviewPath(uid + '_bocadillo')) && existsAfter(reviewPath(uid + '_bocadillo')));
+    function orderPath(id) {
+      return /databases/$(database)/documents/orders/$(id);
     }
 
-    // Ñapa por valorar: 1 sola por cliente (feedbackRewarded), exactamente +1, con el teléfono confirmado
-    // y solo junto a una reseña nueva. Valorar el segundo sabor ya no suma otra.
+    // Ñapa por valorar: 1 por cada pedido entregado que se valora. Exactamente +1 y solo junto a la reseña
+    // nueva de ese pedido (reviews/{lastReviewedOrder}); como la reseña solo se crea una vez, no se repite.
     function isReviewReward(uid) {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['napaCredits', 'feedbackRewarded', 'updatedAt'])
-        && resource.data.get('feedbackRewarded', false) != true
-        && resource.data.get('phoneVerified', false) == true
-        && request.resource.data.feedbackRewarded == true
+      let orderId = request.resource.data.get('lastReviewedOrder', '');
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['napaCredits', 'lastReviewedOrder', 'updatedAt'])
+        && orderId is string
+        && orderId.size() > 0
         && request.resource.data.napaCredits == resource.data.get('napaCredits', 0) + 1
         && request.resource.data.updatedAt == request.time
-        && createsReview(uid);
+        && !exists(reviewPath(orderId))
+        && existsAfter(reviewPath(orderId))
+        && getAfter(reviewPath(orderId)).data.rewarded == true;
     }
 
     match /customers/{uid} {
@@ -303,19 +304,26 @@ service cloud.firestore {
         && d.createdAt == request.time;
     }
 
-    // Una reseña por cliente y producto: id "<uid>_<producto>", solo se crea y nunca se sobrescribe.
-    // El Clásico y el Bocadillo son documentos distintos: se valoran por separado.
+    // Pedido propio, entregado y que incluye el sabor valorado
+    function reviewableOrder(orderId, product) {
+      return exists(orderPath(orderId))
+        && get(orderPath(orderId)).data.get('uid', '') == request.auth.uid
+        && get(orderPath(orderId)).data.status == 'completed'
+        && get(orderPath(orderId)).data.items.get(product, 0) > 0;
+    }
+
+    // Una reseña por pedido entregado: id = id del pedido, solo se crea y nunca se sobrescribe.
+    // Siempre va con su ñapa (+1 al cliente en el mismo lote, ver isReviewReward).
     match /reviews/{reviewId} {
       allow read: if true;
       allow create: if signedIn()
-        && reviewId == request.auth.uid + '_' + request.resource.data.product
         && validReview(request.resource.data)
         && request.resource.data.test == isAnonymous()
-        && get(customerPath(request.auth.uid)).data.get('purchased', {}).get(request.resource.data.product, 0) > 0
-        // rewarded: true solo si en este mismo lote el cliente recibe su única ñapa por valorar
-        && (request.resource.data.rewarded == false
-              || (getAfter(customerPath(request.auth.uid)).data.get('feedbackRewarded', false) == true
-                  && get(customerPath(request.auth.uid)).data.get('feedbackRewarded', false) != true))
+        && request.resource.data.rewarded == true
+        && reviewableOrder(reviewId, request.resource.data.product)
+        && getAfter(customerPath(request.auth.uid)).data.get('napaCredits', 0)
+             == get(customerPath(request.auth.uid)).data.get('napaCredits', 0) + 1
+        && getAfter(customerPath(request.auth.uid)).data.get('lastReviewedOrder', '') == reviewId
         && existsAfter(/databases/$(database)/documents/reviewAuthors/$(reviewId));
       // Generador de datos de prueba del panel: clientes "seed_*", siempre marcadas como prueba
       allow create: if isAdmin()
@@ -334,7 +342,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasAll(['uid', 'product'])
         && request.resource.data.keys().hasOnly(['uid', 'product'])
         && request.resource.data.uid == request.auth.uid
-        && reviewId == request.auth.uid + '_' + request.resource.data.product
+        && reviewableOrder(reviewId, request.resource.data.product)
         && existsAfter(/databases/$(database)/documents/reviews/$(reviewId));
       allow create: if isAdmin()
         && reviewId.matches('^seed_.+')

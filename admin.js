@@ -12,7 +12,7 @@ import {
 import {
     ensureCostData, parseEuros, UNITS_PER_BATCH, renderCostMonitor, renderShoppingList, unitCosts,
     updateCostSettings, updateIngredientSpec, updatePackPrice, watchCostData
-} from "./admin-costs.js";
+} from "./admin-cost-monitor.js";
 import { adminAuth, adminDb as db } from "./admin-firebase.js";
 import { mountEnvBanner, TEST_CUSTOMERS, TEST_PHONES_LABEL, USE_EMULATORS } from "./env.js";
 import { hydrateIcons, icon } from "./icons.js";
@@ -709,7 +709,8 @@ function renderReviews() {
     container.replaceChildren(...reviews.map(reviewCard));
 }
 
-// Recompensa por feedback: 1 ñapa por cliente y solo con el teléfono confirmado (evita multicuenta)
+// Recompensa manual para reseñas antiguas sin ñapa (las nuevas ya llevan la suya: 1 por pedido entregado valorado).
+// Solo con el teléfono confirmado (evita multicuenta).
 async function rewardReview(reviewId, button) {
     try {
         const outcome = await withBusy(button, '…', () => runTransaction(db, async tx => {
@@ -726,10 +727,8 @@ async function rewardReview(reviewId, button) {
             if (!customer.phoneVerified) return 'not-verified';
 
             tx.update(reviewRef, { rewarded: true });
-            if (customer.feedbackRewarded) return 'customer-already';
             tx.update(customerRef, {
                 napaCredits: (customer.napaCredits || 0) + 1,
-                feedbackRewarded: true,
                 updatedAt: serverTimestamp()
             });
             return 'rewarded';
@@ -737,7 +736,6 @@ async function rewardReview(reviewId, button) {
 
         const messages = {
             rewarded: ['Ñapa añadida: se entregará en el próximo pedido del cliente.', 'success'],
-            'customer-already': ['Este cliente ya recibió su ñapa por feedback; la reseña queda marcada.', 'info'],
             'not-verified': ['El teléfono de este cliente aún no está confirmado (se confirma al entregar un pedido).', 'info'],
             'no-customer': ['No se encontró al cliente de esta reseña.', 'error'],
             already: ['Esta reseña ya estaba recompensada.', 'info']
@@ -750,7 +748,7 @@ async function rewardReview(reviewId, button) {
 }
 
 async function deleteReview(reviewId) {
-    if (!confirm('¿Eliminar esta reseña? El cliente podrá volver a valorar ese producto.')) return;
+    if (!confirm('¿Eliminar esta reseña? El cliente podrá volver a valorar ese pedido (y ganaría otra ñapa).')) return;
     try {
         const batch = writeBatch(db);
         batch.delete(doc(db, 'reviews', reviewId));

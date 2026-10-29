@@ -26,7 +26,7 @@ Plataforma web desarrollada para la gestión, procesamiento y control de pedidos
 | `resenas.html` + `resenas.js` | Valoraciones anónimas (una por cliente y producto) |
 | `admin.html` + `admin.js` | Panel del obrador (email y contraseña) |
 | `admin-firebase.js` | Instancia de Firebase **exclusiva del panel**: su sesión nunca se mezcla con la de los clientes |
-| `admin-costs.js` | Monitor de costes: proveedores reales, precio actual frente al anterior, margen por pandebono y lista de la compra |
+| `admin-cost-monitor.js` | Monitor de costes (solo lógica; los datos están en Firestore, solo para el obrador): proveedores, precio actual frente al anterior, margen por pandebono y lista de la compra |
 | `admin-biometric.js` | Desbloqueo del panel con Face ID / Touch ID / huella (WebAuthn) sobre la sesión guardada en el dispositivo |
 | `ui.js` / `icons.js` / `faq.js` | Interfaz común: diálogos animados, avisos, iconos SVG y preguntas frecuentes |
 | `firebase-config.js` | Configuración pública del proyecto |
@@ -63,7 +63,7 @@ Plataforma web desarrollada para la gestión, procesamiento y control de pedidos
 
 ## Producción y costes
 
-* **1 tanda = 8 pandebonos** (`UNITS_PER_BATCH` en `admin-costs.js`). El panel separa **Pendientes de hornear** (pedidos pendientes o en preparación) y **Horneados** (listos o entregados), y expresa lo pendiente en tandas completas de 8.
+* **1 tanda = 8 pandebonos** (`UNITS_PER_BATCH` en `admin-cost-monitor.js`). El panel separa **Pendientes de hornear** (pedidos pendientes o en preparación) y **Horneados** (listos o entregados), y expresa lo pendiente en tandas completas de 8.
 * Pago en **efectivo o Bizum** al recoger o recibir el pedido.
 
 ## Antifraude: un teléfono, una cuenta
@@ -87,7 +87,7 @@ el panel (**📱 Teléfonos vinculados**).
 
 * **Por volumen:** 1 ñapa por cada 10 € del pedido (envío incluido).
 * **Por invitación:** cada cliente tiene un código (p. ej. `ANA-7K3P`). Quien se da de alta con él queda vinculado; al entregarle su primer pedido, el recomendador acumula 1 ñapa (si ya tiene alguna compra entregada).
-* **Por valorar:** la primera reseña del cliente le da 1 ñapa automáticamente (con el teléfono confirmado). Valorar el segundo sabor no suma otra: las reglas (`isReviewReward`) solo aceptan +1 una vez por cliente (`feedbackRewarded`).
+* **Por valorar:** 1 ñapa por cada pedido entregado que el cliente valora (elige el pedido y el sabor). La reseña usa el id del pedido (`reviews/{idPedido}`) y solo se crea una vez; las reglas (`isReviewReward` + `reviewableOrder`) exigen pedido propio, entregado, con ese sabor, y exactamente +1 en el mismo lote.
 * Al hacer el pedido, el cliente elige cuántas de sus ñapas acumuladas canjea (de 0 al total, campo opcional `creditsToRedeem`). Las elegidas aparecen en el panel y se descuentan al entregarlo; las demás siguen en su saldo. Los pedidos antiguos sin ese campo canjean todo el saldo, como antes.
 * Los clientes anteriores a las cuentas de Google (identificados por teléfono) se fusionan automáticamente con su nueva cuenta al entregarles el primer pedido.
 
