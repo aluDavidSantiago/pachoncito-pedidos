@@ -10,7 +10,7 @@
     <link rel="icon" href="icons/favicon-light-48.png" media="(prefers-color-scheme: light)">
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     <title>Pachoncito | Obrador</title>
-    <link rel="stylesheet" href="style.css?v=2.3.4">
+    <link rel="stylesheet" href="style.css?v=2.3.5">
 </head>
 <body class="admin-page">
     <div class="admin-container">
@@ -62,28 +62,24 @@
         <main id="dashboard" hidden>
             <p id="adminMessage" class="form-message" role="status" aria-live="polite" hidden></p>
 
-            <!-- Estado del obrador: abierto o en descanso (settings/store); la carta lo refleja al instante -->
-            <section class="store-status" id="storeStatus" data-open="true" aria-labelledby="storeStatusTitle">
-                <div class="store-status-text">
-                    <h2 id="storeStatusTitle" class="store-status-title">Obrador <span id="storeStatusLabel">abierto</span></h2>
-                    <p class="hint" id="storeStatusHint">Los clientes pueden reservar.</p>
-                </div>
-                <label class="switch">
-                    <span class="visually-hidden">Obrador abierto a reservas</span>
-                    <input type="checkbox" role="switch" id="storeOpenToggle" checked disabled>
-                    <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
-                </label>
-            </section>
-
             <!-- Domingo de entrega y resumen de producción -->
             <section class="dash-section" aria-labelledby="productionTitle">
                 <div class="dash-section-head">
                     <h2 id="productionTitle" class="section-title">Producción</h2>
-                    <label class="sunday-select">
-                        <span class="visually-hidden">Domingo de entrega</span>
-                        <span data-icon="calendar"></span>
-                        <select id="sundaySelect"></select>
-                    </label>
+                    <div class="dash-controls">
+                        <!-- Obrador abierto / en descanso (settings/store): la carta lo refleja al instante -->
+                        <label class="store-pill" id="storeStatus" data-open="true" title="Los clientes pueden reservar">
+                            <span class="store-dot" aria-hidden="true"></span>
+                            <span id="storeStatusLabel">Reservas abiertas</span>
+                            <input type="checkbox" role="switch" id="storeOpenToggle" checked disabled aria-describedby="storeStatusLabel">
+                            <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+                        </label>
+                        <label class="sunday-select">
+                            <span class="visually-hidden">Domingo de entrega</span>
+                            <span data-icon="calendar"></span>
+                            <select id="sundaySelect"></select>
+                        </label>
+                    </div>
                 </div>
 
                 <div class="kpi-grid">
@@ -150,7 +146,7 @@
                 <div class="dash-section-head">
                     <h2 id="costsTitle" class="section-title">Materias primas y costes</h2>
                     <!-- Catálogo privado (receta, proveedores, precios): se carga desde un archivo del obrador, nunca desde la web -->
-                    <label class="btn btn-small file-button">
+                    <label class="btn btn-small file-button" title="Cargar tu archivo privado catalogo-pachoncito.json">
                         <span data-icon="layers"></span>Importar catálogo
                         <input type="file" id="catalogFile" accept="application/json,.json" class="visually-hidden">
                     </label>
@@ -227,6 +223,6 @@
         </div>
     </dialog>
 
-    <script type="module" src="admin.js?v=2.3.4"></script>
+    <script type="module" src="admin.js?v=2.3.5"></script>
 </body>
 </html>

@@ -269,16 +269,18 @@ function marginRow(label, priceCents, costCents) {
 export function renderCostMonitor(container, data, handlers) {
     const { ingredients, settings } = data;
     if (!ingredients.length) {
-        container.replaceChildren(el('p', {
-            className: 'empty-state',
-            text: 'No hay ingredientes en la base de datos. Pulsa «Importar catálogo» y elige tu archivo privado (catalogo-pachoncito.json): por seguridad, la receta no viaja en el código de la web.'
-        }));
+        container.replaceChildren(el('div', { className: 'recipe-panel recipe-empty' },
+            el('h3', {}, icon('clipboard'), 'Tu receta aún no está cargada'),
+            el('p', { className: 'hint', text: 'Por seguridad, la receta, los proveedores y los precios no viajan en el código de la web: viven solo en tu base de datos. Cárgalos una vez desde tu archivo privado catalogo-pachoncito.json.' }),
+            el('label', { className: 'btn btn-primary', for: 'catalogFile' }, icon('layers'), 'Importar catálogo')
+        ));
         return;
     }
     const costs = unitCosts(data);
     const otherInput = el('input', { type: 'number', inputmode: 'decimal', step: '0.01', min: '0', value: ((settings.otherPerBatchCents || 0) / 100).toFixed(2), 'aria-label': 'Otros costes por tanda' });
 
     container.replaceChildren(
+        recipePanel(ingredients),
         el('div', { className: 'margin-panel' },
             el('div', { className: 'margin-head' },
                 el('h3', {}, icon('trend'), 'Margen por pandebono'),
@@ -290,7 +292,6 @@ export function renderCostMonitor(container, data, handlers) {
                 ? el('p', { className: 'impact-line is-warning', text: `Coste incompleto: falta la cantidad usada de ${costs.missing.join(', ')}.` })
                 : null
         ),
-        recipePanel(ingredients),
         el('div', { className: 'cost-grid' }, ingredients.map(ing => ingredientCard(ing, handlers))),
         el('details', { className: 'recipe-spec other-costs' },
             el('summary', {}, 'Otros costes por tanda', icon('chevron', 'icon chevron')),

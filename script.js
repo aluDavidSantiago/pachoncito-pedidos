@@ -8,8 +8,8 @@ import { mountInstallPrompt, registerServiceWorker } from "./pwa.js";
 import { playReward, playSuccess, playTap } from "./sound.js";
 import { requireCustomer } from "./session.js";
 import { watchStore } from "./store.js";
-import { bump, initUI, mountTopNav, nudge } from "./ui.js";
-import { el, formatEUR, MAX_QTY, NAPA_EVERY_CENTS, PRICES_CENTS, showMessage, storage, validateMobile } from "./shared.js";
+import { bump, closeDialog, initUI, mountTopNav, nudge } from "./ui.js";
+import { el, formatEUR, MAX_QTY, NAPA_EVERY_CENTS, PRICES_CENTS, PRODUCT_NAMES, showMessage, storage, validateMobile } from "./shared.js";
 
 mountEnvBanner();
 registerServiceWorker();
@@ -161,6 +161,24 @@ function renderStore(open) {
     syncSubmit();
 }
 
+// Confirmación tras reservar, con el botón grande que lleva al seguimiento en vivo (Mi cuenta)
+function showOrderDone({ orderId, firstName, items, order, slot, redeemed }) {
+    const lines = Object.entries(PRODUCT_NAMES)
+        .filter(([key]) => items[key] > 0)
+        .map(([key, name]) => `${items[key]} × ${name}`);
+    lines.push(`${order.deliveryMethod === 'domicilio' ? 'Envío a domicilio' : 'Recogida en el obrador'} · domingo a las ${slot}`);
+    if (order.napaCount > 0) lines.push(`${order.napaCount} ${order.napaCount === 1 ? 'ñapa' : 'ñapas'} de regalo`);
+    if (redeemed > 0) lines.push(`${redeemed} ${redeemed === 1 ? 'ñapa acumulada canjeada' : 'ñapas acumuladas canjeadas'}`);
+    lines.push(`Total ${formatEUR(order.totalCents)} · efectivo o Bizum al recibirlo`);
+
+    $('orderDoneLead').textContent = `Gracias, ${firstName}. Ya lo tenemos apuntado para el domingo.`;
+    $('orderDoneSummary').replaceChildren(...lines.map(text => el('li', { text })));
+    $('orderDoneTrack').href = `cuenta.html?pedido=${encodeURIComponent(orderId)}#historial`;
+    $('orderDone').showModal();
+}
+
+$('orderDoneClose').addEventListener('click', () => closeDialog($('orderDone')));
+
 function fail(text, field) {
     showMessage(message, text, 'error');
     if (field) field.focus();
@@ -186,7 +204,9 @@ form.addEventListener('submit', async event => {
     submitBtn.textContent = 'Guardando pedido…';
 
     try {
-        await addDoc(collection(db, 'orders'), buildOrder({
+        const items = { ...quantities };
+        const redeemed = napasToRedeem;
+        const ref = await addDoc(collection(db, 'orders'), buildOrder({
             uid: session.uid,
             name: nombre,
             phone: profile.phone,
@@ -212,7 +232,7 @@ form.addEventListener('submit', async event => {
 
         playSuccess();
         showMessage(message, `Pedido reservado, ${nombre.split(' ')[0]}. Te esperamos el domingo; puedes seguirlo en «Mi cuenta».`, 'success');
-        message.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        showOrderDone({ orderId: ref.id, firstName: nombre.split(' ')[0], items, order, slot: hora, redeemed });
     } catch (error) {
         console.error('Error al guardar el pedido:', error);
         fail(!storeOpen

@@ -298,10 +298,8 @@ function renderStoreStatus(open) {
     toggle.checked = open;
     toggle.disabled = false;
     $('storeStatus').dataset.open = String(open);
-    $('storeStatusLabel').textContent = open ? 'abierto' : 'en descanso';
-    $('storeStatusHint').textContent = open
-        ? 'Los clientes pueden reservar.'
-        : 'La carta se ve, pero las reservas están en pausa.';
+    $('storeStatus').title = open ? 'Los clientes pueden reservar' : 'La carta se ve, pero las reservas están en pausa';
+    $('storeStatusLabel').textContent = open ? 'Reservas abiertas' : 'Obrador en descanso';
 }
 
 $('storeOpenToggle').addEventListener('change', async event => {

@@ -107,6 +107,9 @@ function redeemedText(order) {
 
 // Historial en tiempo real: cuando el obrador cambia el estado (Listo, Entregado…) se ve al instante, sin recargar
 let lastStatus = new Map(); // id → estado, para resaltar el pedido que acaba de cambiar
+// Pedido recién reservado (cuenta.html?pedido=<id>, desde la confirmación de la carta): se destaca y se lleva a la vista
+const trackedId = new URLSearchParams(location.search).get('pedido');
+let trackedShown = false;
 
 function watchOrders() {
     const list = $('ordersList');
@@ -119,10 +122,18 @@ function watchOrders() {
         list.replaceChildren(...(orders.length
             ? orders.map(order => {
                 const card = orderItem(order);
+                card.dataset.orderId = order.id;
                 if (changed.includes(order)) card.classList.add('is-updated');
+                if (order.id === trackedId) card.classList.add('is-tracked');
                 return card;
             })
             : [el('p', { className: 'empty-state', text: 'Todavía no has hecho ningún pedido.' })]));
+        const tracked = trackedId && list.querySelector('.is-tracked');
+        if (tracked && !trackedShown) {
+            trackedShown = true; // solo se desplaza la primera vez
+            const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+            tracked.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+        }
         if (changed.length) {
             const [statusText] = STATUS[changed[0].status] || STATUS.pending;
             toast(`Tu pedido ha cambiado: ${statusText}.`, 'success');
