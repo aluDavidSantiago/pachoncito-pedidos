@@ -1,6 +1,8 @@
 // Lógica de pedidos compartida por la web (script.js), el panel (admin.js) y el generador de pruebas (seeder.js).
 // buildOrder() produce exactamente la forma que exige validNewOrder() en firestore.rules.
-import { doc, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import {
+    collection, doc, getDoc, runTransaction, serverTimestamp, writeBatch
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { DELIVERY_CENTS, NAPA_EVERY_CENTS, normalizePhone, PRICES_CENTS } from "./shared.js";
 
 export const PICKUP_ADDRESS = 'Recogida en local';
@@ -15,7 +17,8 @@ export function priceOrder(items, deliveryMethod) {
 
 // uid = cuenta del cliente; phone = su teléfono/WhatsApp vinculado (contacto para la entrega)
 // creditsToRedeem = ñapas acumuladas que el cliente elige canjear en este pedido (0…saldo); las demás se le guardan
-export function buildOrder({ uid, name, phone, items, deliveryMethod, address, slot, test, creditsToRedeem }) {
+// welcomeGift = regalo de bienvenida (1 clásico gratis en su primer pedido web): no cambia items, precios ni ñapas
+export function buildOrder({ uid, name, phone, items, deliveryMethod, address, slot, test, creditsToRedeem, welcomeGift }) {
     return {
         uid,
         customerName: name,
@@ -26,6 +29,7 @@ export function buildOrder({ uid, name, phone, items, deliveryMethod, address, s
         address: deliveryMethod === 'domicilio' ? address : PICKUP_ADDRESS,
         deliverySlot: slot,
         ...(Number.isInteger(creditsToRedeem) ? { creditsToRedeem } : {}),
+        ...(welcomeGift ? { welcomeGift: true } : {}),
         status: 'pending',
         test: Boolean(test),
         createdAt: serverTimestamp()
@@ -43,8 +47,48 @@ export function normalizeOrder(snap) {
         // null = pedido anterior a la elección de ñapas: canjea todo el saldo, como antes
         creditsToRedeem: Number.isInteger(data.creditsToRedeem) ? data.creditsToRedeem : null,
         phoneKey: normalizePhone(data.phone),
+        welcomeGift: data.welcomeGift === true,
         uid: data.uid || null
     };
+}
+
+// ---------- Regalo de bienvenida ----------
+// 1 pandebono clásico gratis en el primer pedido web de cada cliente. welcomeGifts/{uid} (y welcomeGifts/{teléfono})
+// es el cerrojo «esta cuenta ya tiene un pedido web»: se crea junto a su primer pedido web, lleve o no el regalo.
+export const WELCOME_GIFT_PRODUCT = 'clasico';
+export const WELCOME_GIFT_LABEL = 'Regalo de bienvenida';
+
+// Las cuentas de prueba comparten teléfonos de prueba: su cerrojo es solo el de la cuenta
+export const welcomeLockIds = (uid, phone, test) => (test || !phone ? [uid] : [uid, phone]);
+
+// Cerrojos que aún no existen, o null si no se pueden consultar (p. ej. reglas antiguas): entonces el pedido
+// se guarda como antes, sin regalo y sin cerrojos.
+export async function missingWelcomeLocks(db, ids) {
+    try {
+        const snaps = await Promise.all(ids.map(id => getDoc(doc(db, 'welcomeGifts', id))));
+        return ids.filter((_, i) => !snaps[i].exists());
+    } catch (error) {
+        console.warn('No se pudieron consultar los cerrojos del regalo de bienvenida:', error);
+        return null;
+    }
+}
+
+// Guarda el pedido y, en el mismo lote, los cerrojos que falten (las reglas exigen ambos a la vez si lleva regalo)
+export async function placeOrder(db, order, missingLocks = []) {
+    const ref = doc(collection(db, 'orders'));
+    const batch = writeBatch(db);
+    batch.set(ref, order);
+    for (const id of missingLocks) {
+        batch.set(doc(db, 'welcomeGifts', id), {
+            uid: order.uid,
+            orderId: ref.id,
+            gift: order.welcomeGift === true,
+            test: order.test,
+            createdAt: serverTimestamp()
+        });
+    }
+    await batch.commit();
+    return ref;
 }
 
 // Al entregar un pedido (en una sola transacción):

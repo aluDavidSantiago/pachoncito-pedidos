@@ -47,12 +47,14 @@ async function commitInChunks(db, allRefs) {
 
 // Borra todo lo marcado como prueba (generador y cuentas anónimas del modo pruebas). Nunca toca datos reales.
 export async function clearTestData(db) {
-    const [customers, orders, reviews, legacyOrders, legacyAuthors] = await Promise.all([
+    const [customers, orders, reviews, legacyOrders, legacyAuthors, welcomeLocks] = await Promise.all([
         getDocs(query(collection(db, 'customers'), where('test', '==', true))),
         getDocs(query(collection(db, 'orders'), where('test', '==', true))),
         getDocs(query(collection(db, 'reviews'), where('test', '==', true))),
         getDocs(query(collection(db, 'orders'), where('phone', 'in', LEGACY_TEST_PHONES))),
-        getDocs(query(collection(db, 'reviewAuthors'), where('phone', 'in', LEGACY_TEST_PHONES)))
+        getDocs(query(collection(db, 'reviewAuthors'), where('phone', 'in', LEGACY_TEST_PHONES))),
+        // Cerrojos del regalo de bienvenida de prueba (con reglas anteriores no se pueden leer: se omiten)
+        getDocs(query(collection(db, 'welcomeGifts'), where('test', '==', true))).catch(() => ({ forEach() {} }))
     ]);
 
     const refs = [];
@@ -65,6 +67,7 @@ export async function clearTestData(db) {
     orders.forEach(snap => refs.push(snap.ref));
     reviews.forEach(snap => refs.push(snap.ref, doc(db, 'reviewAuthors', snap.id)));
     legacyOrders.forEach(snap => refs.push(snap.ref));
+    welcomeLocks.forEach(snap => refs.push(snap.ref));
     legacyAuthors.forEach(snap => refs.push(snap.ref, doc(db, 'reviews', snap.id)));
     LEGACY_TEST_PHONES.forEach(phone => refs.push(doc(db, 'customers', phone)));
 
