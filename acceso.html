@@ -15,7 +15,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Pachoncito">
     <title>Pachoncito | Entrar</title>
-    <link rel="stylesheet" href="style.css?v=2.4.0">
+    <link rel="stylesheet" href="style.css?v=2.4.1">
 </head>
 <body>
     <div class="container">
@@ -27,6 +27,16 @@
         </header>
 
         <main>
+            <!-- Regalo de bienvenida (settings/store.welcomeGift): anuncio para quien aún no ha pedido (acceso.js) -->
+            <div class="welcome-gift welcome-promo" id="welcomePromo" aria-live="polite" hidden>
+                <span data-icon="gift" class="welcome-gift-icon"></span>
+                <div class="welcome-gift-info">
+                    <strong>Regalo de bienvenida</strong>
+                    <span class="hint" id="welcomePromoText">Regístrate y en tu primer pedido te regalamos 1 pandebono clásico</span>
+                </div>
+                <span class="welcome-gift-price">Gratis</span>
+            </div>
+
             <p id="stepLoading" class="loading-state">Comprobando tu sesión…</p>
 
             <!-- Navegador interno de Instagram/Facebook: Google bloquea ahí su inicio de sesión -->
@@ -133,6 +143,6 @@
         </dialog>
     </div>
 
-    <script type="module" src="acceso.js?v=2.4.0"></script>
+    <script type="module" src="acceso.js?v=2.4.1"></script>
 </body>
 </html>
