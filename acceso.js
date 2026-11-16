@@ -14,6 +14,7 @@ import { hydrateIcons } from "./icons.js";
 import { isStandalone, mountInstallPrompt, registerServiceWorker } from "./pwa.js";
 import { endSession, getProfile, getSession, hasCompletedProfile, safeNext } from "./session.js";
 import { formatMobile, normalizePhone, phoneDigits, showMessage, storage, validateMobile, withBusy } from "./shared.js";
+import { watchStore } from "./store.js";
 import { closeDialog, initUI } from "./ui.js";
 
 mountEnvBanner();
@@ -42,8 +43,32 @@ const IS_ANDROID = /Android/i.test(navigator.userAgent);
 let session = null;
 let profile = null;
 
+// Anuncio del regalo de bienvenida: en el acceso, el alta y la bienvenida (no al re-vincular un teléfono)
+const PROMO_TEXT = {
+    stepInApp: 'Regístrate y en tu primer pedido te regalamos 1 pandebono clásico',
+    stepSignIn: 'Regístrate y en tu primer pedido te regalamos 1 pandebono clásico',
+    stepProfile: 'Completa tu cuenta: tu primer pedido lleva 1 pandebono clásico gratis',
+    stepWelcome: 'Tu primer pedido lleva 1 pandebono clásico gratis'
+};
+let welcomeGiftActive = false;
+let currentStep = 'stepLoading';
+
+function renderPromo() {
+    const text = PROMO_TEXT[currentStep];
+    const relinking = currentStep === 'stepProfile' && Boolean(profile);
+    $('welcomePromo').hidden = !(welcomeGiftActive && text && !relinking);
+    if (text) $('welcomePromoText').textContent = text;
+}
+
+watchStore(db, (_open, { welcomeGift }) => {
+    welcomeGiftActive = welcomeGift;
+    renderPromo();
+});
+
 function showStep(stepId) {
     STEPS.forEach(id => { $(id).hidden = id !== stepId; });
+    currentStep = stepId;
+    renderPromo();
 }
 
 function goNext() {

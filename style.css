@@ -1312,6 +1312,11 @@ input[type="radio"] {
     white-space: nowrap;
 }
 
+.welcome-promo {
+    margin-bottom: 1.125rem;
+    animation: pop var(--dur-3) var(--ease-spring);
+}
+
 .summary-gift {
     display: inline-flex;
     align-items: center;
