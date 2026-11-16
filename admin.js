@@ -1,7 +1,7 @@
 // Panel del obrador. Usa SU PROPIA instancia de Firebase (admin-firebase.js): la sesión de email y contraseña
 // del obrador nunca se mezcla con la sesión de Google de un cliente en el mismo navegador.
 import {
-    collection, deleteDoc, doc, getDoc, limit, onSnapshot, orderBy, query,
+    collection, deleteDoc, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query,
     runTransaction, serverTimestamp, updateDoc, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
@@ -16,9 +16,9 @@ import {
 import { adminAuth, adminDb as db } from "./admin-firebase.js";
 import { mountEnvBanner, TEST_CUSTOMERS, TEST_PHONES_LABEL, USE_EMULATORS } from "./env.js";
 import { hydrateIcons, icon } from "./icons.js";
-import { completeOrder, normalizeOrder } from "./orders.js";
+import { completeOrder, normalizeOrder, WELCOME_GIFT_LABEL, welcomeLockIds } from "./orders.js";
 import { clearTestData, seedTestData } from "./seeder.js";
-import { setStoreOpen, watchStore } from "./store.js";
+import { setStoreOpen, setWelcomeGift, watchStore } from "./store.js";
 import { el, formatDate, formatEUR, normalizePhone, PRODUCT_NAMES, RATING_ASPECTS, showMessage, starsText, withBusy } from "./shared.js";
 import { closeDialog, initUI, toast } from "./ui.js";
 
@@ -270,7 +270,10 @@ function startListeners() {
             reviews = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             renderReviews();
         }, onError),
-        watchStore(db, renderStoreStatus, onError)
+        watchStore(db, (open, { welcomeGift }) => {
+            renderStoreStatus(open);
+            renderWelcomeStatus(welcomeGift);
+        }, onError)
     ];
 
     ensureCostData(db)
@@ -415,7 +418,8 @@ function productionOf(list) {
     const p = { clasicos: 0, bocadillos: 0, napas: 0, units: 0, pendingUnits: 0, bakedUnits: 0, ingresosCents: 0 };
     for (const order of list) {
         if (order.status === 'rejected') continue;
-        const clasicos = order.items?.clasico || 0;
+        // El regalo de bienvenida es 1 clásico más que hornear: cuenta como coste, no como ingreso
+        const clasicos = (order.items?.clasico || 0) + (order.welcomeGift ? 1 : 0);
         const bocadillos = order.items?.bocadillo || 0;
         const napas = order.napaCount + (orderCredits.get(order.id) || 0);
         const units = clasicos + bocadillos + napas;
@@ -514,6 +518,9 @@ function orderCard(order) {
                 className: customer?.phoneVerified ? 'meta-success' : 'meta-accent',
                 text: customer?.phoneVerified ? 'Teléfono confirmado' : 'Teléfono sin confirmar: compruébalo al entregar'
             }),
+        order.welcomeGift
+            ? el('p', { className: 'meta-success', text: `${WELCOME_GIFT_LABEL}: +1 clásico gratis (no se cobra)` })
+            : null,
         order.napaCount > 0
             ? el('p', { className: 'meta-success', text: `Incluye ${order.napaCount} ${order.napaCount === 1 ? 'ñapa' : 'ñapas'} por volumen de compra` })
             : null,
@@ -806,6 +813,80 @@ $('releasePhoneBtn').addEventListener('click', async event => {
     } catch (error) {
         console.error('Error al liberar el teléfono:', error);
         showMessage(releaseMessage, 'No se pudo liberar el teléfono.', 'error');
+    }
+});
+
+// ---------- Regalo de bienvenida ----------
+// 1 clásico gratis en el primer pedido web. Antes de activarlo se crea el cerrojo welcomeGifts/{uid} (y el de su
+// teléfono) a cada cliente que ya tenga algún pedido web, también pendientes o cancelados: las reglas no pueden
+// buscar pedidos, así que sin cerrojo esos clientes podrían llevárselo. Repetirlo es seguro (solo crea los que faltan).
+
+let welcomeActive = false;
+
+function renderWelcomeStatus(active) {
+    welcomeActive = active;
+    $('welcomeStatus').textContent = active
+        ? 'Activo: el primer pedido web de cada cliente lleva 1 clásico gratis.'
+        : 'En pausa: la web no ofrece el regalo.';
+    $('welcomeStatus').dataset.type = active ? 'success' : 'info';
+    $('welcomeStatus').hidden = false;
+    $('welcomePrepareBtn').textContent = active ? 'Repasar pedidos anteriores' : 'Preparar y activar el regalo';
+    $('welcomePauseBtn').hidden = !active;
+}
+
+async function prepareWelcomeLocks() {
+    const [ordersSnap, customersSnap, locksSnap] = await Promise.all([
+        getDocs(collection(db, 'orders')),
+        getDocs(collection(db, 'customers')),
+        getDocs(collection(db, 'welcomeGifts'))
+    ]);
+    const existing = new Set(locksSnap.docs.map(d => d.id));
+    const customersById = new Map(customersSnap.docs.map(d => [d.id, d.data()]));
+    const writes = [];
+    const uids = new Set(ordersSnap.docs.map(d => d.data().uid).filter(uid => typeof uid === 'string' && uid));
+    for (const uid of uids) {
+        const customer = customersById.get(uid);
+        const test = Boolean(customer?.test ?? ordersSnap.docs.find(d => d.data().uid === uid)?.data().test);
+        for (const id of welcomeLockIds(uid, customer?.phone, test)) {
+            if (existing.has(id)) continue;
+            existing.add(id);
+            writes.push([id, { uid, orderId: null, gift: false, test, source: 'pedidos-anteriores', createdAt: serverTimestamp() }]);
+        }
+    }
+    for (let i = 0; i < writes.length; i += 400) {
+        const batch = writeBatch(db);
+        writes.slice(i, i + 400).forEach(([id, data]) => batch.set(doc(db, 'welcomeGifts', id), data));
+        await batch.commit();
+    }
+    return { customers: uids.size, created: writes.length };
+}
+
+$('welcomePrepareBtn').addEventListener('click', async event => {
+    const welcomeMessage = $('welcomeMessage');
+    if (!welcomeActive && !confirm('Se marcarán como «ya pidió» todos los clientes con algún pedido web y se activará el regalo de bienvenida. ¿Continuar?')) return;
+    try {
+        const result = await withBusy(event.currentTarget, 'Preparando…', async () => {
+            const prepared = await prepareWelcomeLocks();
+            if (!welcomeActive) await setWelcomeGift(db, true);
+            return prepared;
+        });
+        showMessage(welcomeMessage, `Listo: ${result.customers} clientes con pedidos web anteriores · ${result.created} cerrojos nuevos. El regalo está activo.`, 'success');
+    } catch (error) {
+        console.error('Error preparando el regalo de bienvenida:', error);
+        showMessage(welcomeMessage, error?.code === 'permission-denied'
+            ? 'Firestore rechazó la operación. ¿Has desplegado la última versión de firestore.rules?'
+            : 'No se pudo preparar el regalo de bienvenida. Vuelve a intentarlo: es seguro repetirlo.', 'error');
+    }
+});
+
+$('welcomePauseBtn').addEventListener('click', async event => {
+    if (!confirm('¿Pausar el regalo de bienvenida? La web dejará de ofrecerlo hasta que lo vuelvas a activar.')) return;
+    try {
+        await withBusy(event.currentTarget, 'Pausando…', () => setWelcomeGift(db, false));
+        showMessage($('welcomeMessage'), 'Regalo de bienvenida en pausa.', 'info');
+    } catch (error) {
+        console.error('Error pausando el regalo de bienvenida:', error);
+        showMessage($('welcomeMessage'), 'No se pudo pausar el regalo de bienvenida.', 'error');
     }
 });
 

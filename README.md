@@ -39,7 +39,7 @@ Plataforma web desarrollada para la gestión, procesamiento y control de pedidos
 | `seeder.js` | Generador de datos de prueba del panel |
 | `pwa.js` + `sw.js` + `manifest.json` + `icons/` | App instalable (PWA) y funcionamiento básico sin conexión |
 | `style.css` | Hoja de estilos única con variables CSS |
-| `firestore.rules` | Reglas de seguridad de la base de datos |
+| `firestore.rules` | Reglas de seguridad de la base de datos (incluido el regalo de bienvenida: `welcomeGifts`) |
 
 > Los precios y la regla de ñapas están en `shared.js` **y** en `firestore.rules`. Si cambian, hay que actualizar ambos.
 
@@ -90,6 +90,13 @@ el panel (**📱 Teléfonos vinculados**).
 * **Por valorar:** 1 ñapa por cada pedido entregado que el cliente valora (elige el pedido y el sabor). La reseña usa el id del pedido (`reviews/{idPedido}`) y solo se crea una vez; las reglas (`isReviewReward` + `reviewableOrder`) exigen pedido propio, entregado, con ese sabor, y exactamente +1 en el mismo lote.
 * Al hacer el pedido, el cliente elige cuántas de sus ñapas acumuladas canjea (de 0 al total, campo opcional `creditsToRedeem`). Las elegidas aparecen en el panel y se descuentan al entregarlo; las demás siguen en su saldo. Los pedidos antiguos sin ese campo canjean todo el saldo, como antes.
 * Los clientes anteriores a las cuentas de Google (identificados por teléfono) se fusionan automáticamente con su nueva cuenta al entregarles el primer pedido.
+
+## Regalo de bienvenida
+
+* **1 pandebono clásico gratis** en el primer pedido que cada cliente hace en la web (los pedidos antiguos por WhatsApp no cuentan). Aparece en el carrito, en el resumen y en el historial como «Regalo de bienvenida»; no cambia precios, total ni ñapas. En el panel suma 1 a los clásicos por hornear (coste, no ingreso).
+* El pedido lleva `welcomeGift: true` y crea en el mismo lote los cerrojos `welcomeGifts/{uid}` y `welcomeGifts/{teléfono}` (las cuentas de prueba, solo el de la cuenta). Las reglas (`validWelcomeGift`) solo aceptan el regalo si está activo (`settings/store.welcomeGift`), el cliente no tiene pedidos entregados (`completedOrders`, sin el campo cuenta como 0) y ninguno de sus cerrojos existía. Todo primer pedido web crea los cerrojos, lleve regalo o no.
+* Las reglas no pueden buscar pedidos, así que **antes de activarlo** el panel (**Regalo de bienvenida → Preparar y activar el regalo**) crea el cerrojo a todo cliente con algún pedido web anterior. Repetirlo es seguro: solo crea los que faltan. Desde ahí también se pausa.
+* Compatibilidad: los pedidos sin regalo no necesitan cerrojo, así que la versión anterior de la web sigue funcionando con las reglas nuevas, y la nueva con las antiguas (si no puede crear los cerrojos, guarda el pedido como antes).
 
 ## Pruebas
 

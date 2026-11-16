@@ -1275,6 +1275,53 @@ input[type="radio"] {
     animation: pop var(--dur-3) var(--ease-spring);
 }
 
+/* Regalo de bienvenida (1 clásico gratis en el primer pedido web) */
+.welcome-gift {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0.875rem;
+    margin-bottom: 0.75rem;
+    border: 1px dashed var(--accent-border);
+    border-radius: var(--radius-md);
+    background: var(--accent-soft);
+    color: var(--text);
+    font-size: var(--fs-sm);
+}
+
+.welcome-gift.is-included {
+    border-style: solid;
+    border-color: var(--success);
+    background: var(--success-soft);
+    animation: pop var(--dur-3) var(--ease-spring);
+}
+
+.welcome-gift-icon { color: var(--accent); flex-shrink: 0; }
+.welcome-gift.is-included .welcome-gift-icon { color: var(--success); }
+
+.welcome-gift-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+.welcome-gift-price {
+    font-weight: 700;
+    color: var(--success);
+    white-space: nowrap;
+}
+
+.summary-gift {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--success);
+    font-weight: 600;
+}
+
+.summary-gift .icon { width: 0.9rem; height: 0.9rem; }
+
 .alert-box.is-reward {
     text-align: left;
     margin-bottom: 0;

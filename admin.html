@@ -10,7 +10,7 @@
     <link rel="icon" href="icons/favicon-light-48.png" media="(prefers-color-scheme: light)">
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     <title>Pachoncito | Obrador</title>
-    <link rel="stylesheet" href="style.css?v=2.3.5">
+    <link rel="stylesheet" href="style.css?v=2.4.0">
 </head>
 <body class="admin-page">
     <div class="admin-container">
@@ -185,6 +185,23 @@
                 </div>
             </details>
 
+            <details class="panel-box admin-tools">
+                <summary>Regalo de bienvenida</summary>
+                <div class="form-section">
+                    <p class="section-desc">
+                        Cada cliente se lleva 1 pandebono clásico gratis en su primer pedido hecho en la web (los pedidos
+                        antiguos por WhatsApp no cuentan). Al activarlo, los clientes que ya tienen algún pedido web quedan
+                        marcados para que no lo reciban. Repasar es seguro: solo marca a quien falte.
+                    </p>
+                    <p id="welcomeStatus" class="form-message" role="status" hidden></p>
+                    <div class="actions-bar">
+                        <button type="button" id="welcomePrepareBtn" class="btn btn-small">Preparar y activar el regalo</button>
+                        <button type="button" id="welcomePauseBtn" class="btn btn-small btn-danger" hidden>Pausar el regalo</button>
+                    </div>
+                    <p id="welcomeMessage" class="form-message" role="status" aria-live="polite" hidden></p>
+                </div>
+            </details>
+
             <details class="panel-box test-tools">
                 <summary>Datos de prueba</summary>
                 <div class="form-section">
@@ -223,6 +240,6 @@
         </div>
     </dialog>
 
-    <script type="module" src="admin.js?v=2.3.5"></script>
+    <script type="module" src="admin.js?v=2.4.0"></script>
 </body>
 </html>

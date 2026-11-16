@@ -4,7 +4,7 @@ import { mountEnvBanner } from "./env.js";
 import { mountFaq } from "./faq.js";
 import { db } from "./firebase.js";
 import { hydrateIcons } from "./icons.js";
-import { normalizeOrder } from "./orders.js";
+import { normalizeOrder, WELCOME_GIFT_LABEL, WELCOME_GIFT_PRODUCT } from "./orders.js";
 import { mountInstallPrompt, registerServiceWorker } from "./pwa.js";
 import { endSession, requireCustomer } from "./session.js";
 import { el, formatDate, formatEUR, PRODUCT_NAMES, showMessage } from "./shared.js";
@@ -84,6 +84,9 @@ function orderItem(order) {
             el('span', { className: `badge-status ${statusClass}`, text: statusText })
         ),
         el('p', { className: 'order-line', text: itemsText(order.items) }),
+        order.welcomeGift
+            ? el('p', { className: 'meta-success', text: `${WELCOME_GIFT_LABEL}: 1 × ${PRODUCT_NAMES[WELCOME_GIFT_PRODUCT]} gratis` })
+            : null,
         el('p', { className: 'order-meta' },
             `${order.deliveryMethod === 'domicilio' ? 'A domicilio' : 'Recogida'} · ${order.deliverySlot || '—'} · `,
             el('strong', { text: formatEUR(order.totalCents) })

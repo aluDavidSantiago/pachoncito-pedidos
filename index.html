@@ -15,7 +15,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Pachoncito">
     <title>Pachoncito | Pedidos</title>
-    <link rel="stylesheet" href="style.css?v=2.3.5">
+    <link rel="stylesheet" href="style.css?v=2.4.0">
 </head>
 <body>
     <div class="container">
@@ -140,6 +140,16 @@
                 </div>
             </details>
 
+            <!-- Regalo de bienvenida: 1 clásico gratis en el primer pedido web (script.js · validWelcomeGift en firestore.rules) -->
+            <div class="welcome-gift" id="welcomeGift" aria-live="polite" hidden>
+                <span data-icon="gift" class="welcome-gift-icon"></span>
+                <div class="welcome-gift-info">
+                    <strong>Regalo de bienvenida</strong>
+                    <span class="hint" id="welcomeGiftHint">Tu primer pedido en la web lleva 1 pandebono clásico gratis</span>
+                </div>
+                <span class="welcome-gift-price">Gratis</span>
+            </div>
+
             <div id="napaAlert" class="alert-box" aria-live="polite">
                 Por cada 10 € de pedido te regalamos una ñapa.
             </div>
@@ -184,7 +194,8 @@
             <p id="formMessage" class="form-message" role="status" aria-live="polite" hidden></p>
 
             <div class="summary">
-                <p class="summary-total">Total a pagar <strong id="totalPrice">0,00 €</strong></p>
+                <p class="summary-total">Total a pagar <strong id="totalPrice">0,00 €</strong>
+                    <span class="summary-gift" id="summaryGift" hidden><span data-icon="gift"></span>+ Regalo de bienvenida</span></p>
                 <p class="payment-note"><span data-icon="cash"></span>Pago en efectivo o Bizum al recoger o recibir el pedido</p>
                 <button type="submit" class="btn btn-primary" id="submitBtn">Reservar para el domingo</button>
             </div>
@@ -213,6 +224,6 @@
         <button type="button" class="btn btn-link" id="orderDoneClose">Hacer otro pedido</button>
     </dialog>
 
-    <script type="module" src="script.js?v=2.3.5"></script>
+    <script type="module" src="script.js?v=2.4.0"></script>
 </body>
 </html>

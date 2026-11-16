@@ -14,13 +14,20 @@ rules_version = '2';
 //   referralCodes/{código}   Código de invitación de cada cliente → su UID.
 //   orders/{id}              El cliente crea pedidos a su nombre y con su teléfono vinculado; lee los suyos.
 //                            creditsToRedeem (opcional): ñapas acumuladas que elige canjear en ese pedido.
+//                            welcomeGift (opcional, true): regalo de bienvenida, 1 pandebono clásico gratis en su
+//                            primer pedido web. No cambia items, precios ni ñapas.
+//   welcomeGifts/{uid}       Cerrojo del regalo de bienvenida: «esta cuenta ya tiene un pedido web». Se crea junto
+//   welcomeGifts/{teléfono}  a su primer pedido web (con o sin regalo) y no se edita ni se borra desde la web. El de
+//                            teléfono evita repetir regalo si un número liberado se vincula a otra cuenta (las
+//                            cuentas de prueba no lo usan: comparten teléfonos de prueba).
 //   reviews/{idPedido}       Públicas y anónimas. Una por pedido entregado (el cliente elige qué sabor valora)
 //                            y cada una da 1 ñapa. Las antiguas (uid_producto) y las de prueba (seed_*) se conservan.
 //   reviewAuthors/{id}       Privado. Vincula cada reseña con su autor (solo lo ve el obrador).
 //   customers/{teléfono}     Expedientes antiguos (antes de las cuentas de Google): solo el obrador.
 //   ingredients/{id}         Materias primas: proveedor, precio, precio anterior y receta por tanda (solo el obrador).
 //   settings/costs           Tamaño de tanda y otros costes (solo el obrador).
-//   settings/store           { open } Obrador abierto o en descanso. Lo lee cualquiera; con open == false no se aceptan pedidos.
+//   settings/store           { open, welcomeGift } Obrador abierto o en descanso (con open == false no se aceptan pedidos)
+//                            y regalo de bienvenida activo. Lo lee cualquiera; lo escribe el obrador.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -123,6 +130,12 @@ service cloud.firestore {
         || get(/databases/$(database)/documents/settings/store).data.get('open', true) != false;
     }
 
+    // Regalo de bienvenida activo: lo activa el panel después de crear los cerrojos de quienes ya habían pedido
+    function welcomeGiftActive() {
+      return exists(/databases/$(database)/documents/settings/store)
+        && get(/databases/$(database)/documents/settings/store).data.get('welcomeGift', false) == true;
+    }
+
     // ---------- Clientes ----------
 
     // Alta: perfil + phoneClaims + referralCodes en el MISMO lote (getAfter comprueba los tres).
@@ -168,6 +181,10 @@ service cloud.firestore {
 
     function orderPath(id) {
       return /databases/$(database)/documents/orders/$(id);
+    }
+
+    function welcomeGiftPath(id) {
+      return /databases/$(database)/documents/welcomeGifts/$(id);
     }
 
     // Ñapa por valorar: 1 por cada pedido entregado que se valora. Exactamente +1 y solo junto a la reseña
@@ -237,7 +254,7 @@ service cloud.firestore {
                               'status', 'test', 'createdAt'])
         && d.keys().hasOnly(['uid', 'customerName', 'phone', 'items', 'subtotalCents', 'deliveryCents',
                              'totalCents', 'napaCount', 'deliveryMethod', 'address', 'deliverySlot',
-                             'status', 'test', 'createdAt', 'creditsToRedeem'])
+                             'status', 'test', 'createdAt', 'creditsToRedeem', 'welcomeGift'])
         && d.uid is string
         && validName(d.customerName)
         && isPhone(d.phone)
@@ -253,6 +270,7 @@ service cloud.firestore {
         && d.totalCents == d.subtotalCents + d.deliveryCents
         && d.napaCount == math.floor(d.totalCents / 1000)
         && (!('creditsToRedeem' in d) || isQty(d.creditsToRedeem))
+        && (!('welcomeGift' in d) || d.welcomeGift == true)
         && d.address is string
         && (d.deliveryMethod == 'domicilio'
               ? (d.address.size() >= 5 && d.address.size() <= 200)
@@ -262,6 +280,24 @@ service cloud.firestore {
         && d.test is bool
         && d.status == 'pending'
         && d.createdAt == request.time;
+    }
+
+    // Regalo de bienvenida (1 clásico gratis), solo en el primer pedido web del cliente:
+    //  · el regalo está activo y el obrador no le ha entregado nunca un pedido (sin completedOrders cuenta como 0);
+    //  · su cerrojo welcomeGifts/{uid} (y el de su teléfono) NO existía y se crea en este mismo lote con este pedido.
+    // Como el cerrojo solo se crea una vez, el regalo no se puede repetir. Los pedidos sin regalo no lo exigen:
+    // así siguen valiendo los pedidos hechos con la versión anterior de la web.
+    function validWelcomeGift(orderId) {
+      let d = request.resource.data;
+      return !('welcomeGift' in d) || (
+        d.welcomeGift == true
+        && welcomeGiftActive()
+        && get(customerPath(request.auth.uid)).data.get('completedOrders', 0) == 0
+        && !exists(welcomeGiftPath(request.auth.uid))
+        && getAfter(welcomeGiftPath(request.auth.uid)).data.orderId == orderId
+        && (isAnonymous()
+              || (!exists(welcomeGiftPath(d.phone))
+                  && getAfter(welcomeGiftPath(d.phone)).data.orderId == orderId)));
     }
 
     match /orders/{orderId} {
@@ -275,14 +311,51 @@ service cloud.firestore {
         // Y ese teléfono tiene que ser un móvil español real (o de prueba en las cuentas de prueba)
         && allowedPhone(request.resource.data.phone)
         // Solo puede canjear las ñapas que tiene acumuladas (las no elegidas se le guardan)
-        && request.resource.data.get('creditsToRedeem', 0) <= get(customerPath(request.auth.uid)).data.get('napaCredits', 0);
+        && request.resource.data.get('creditsToRedeem', 0) <= get(customerPath(request.auth.uid)).data.get('napaCredits', 0)
+        // Regalo de bienvenida: solo en su primer pedido web
+        && validWelcomeGift(orderId);
       // Generador de datos de prueba del panel
       allow create: if isAdmin()
         && validNewOrder(request.resource.data)
         && request.resource.data.test == true
+        && !('welcomeGift' in request.resource.data)
         && request.resource.data.uid.matches('^seed_.+');
       allow read: if isAdmin() || (signedIn() && resource.data.get('uid', '') == request.auth.uid);
       allow update, delete: if isAdmin();
+    }
+
+    // ---------- Regalo de bienvenida: cerrojos ----------
+
+    // Cerrojo de la cuenta (id = uid) o de su teléfono vinculado (id = teléfono; las cuentas de prueba no lo usan).
+    // Solo se crea en el mismo lote que un pedido nuevo de esa cuenta, y gift dice si ese pedido lleva el regalo.
+    function validWelcomeLock(id) {
+      let d = request.resource.data;
+      let orderId = d.get('orderId', '');
+      return d.keys().hasAll(['uid', 'orderId', 'gift', 'test', 'createdAt'])
+        && d.keys().hasOnly(['uid', 'orderId', 'gift', 'test', 'createdAt'])
+        && d.uid == request.auth.uid
+        && d.test == isAnonymous()
+        && d.createdAt == request.time
+        && d.gift is bool
+        && orderId is string
+        && orderId.size() > 0
+        && (id == request.auth.uid
+              || (!isAnonymous() && id == get(customerPath(request.auth.uid)).data.phone))
+        && !exists(orderPath(orderId))
+        && existsAfter(orderPath(orderId))
+        && getAfter(orderPath(orderId)).data.uid == request.auth.uid
+        && d.gift == (getAfter(orderPath(orderId)).data.get('welcomeGift', false) == true);
+    }
+
+    match /welcomeGifts/{lockId} {
+      // El cliente consulta solo su cerrojo y el de su teléfono para saber si tiene el regalo
+      allow get: if signedIn()
+        && (lockId == request.auth.uid
+              || lockId == get(customerPath(request.auth.uid)).data.get('phone', ''));
+      // Solo "create": si ya existe, el lote entero se rechaza
+      allow create: if signedIn() && validWelcomeLock(lockId);
+      // Panel: preparar los cerrojos de quienes ya tenían pedidos y borrar los de prueba
+      allow read, write: if isAdmin();
     }
 
     // ---------- Reseñas ----------

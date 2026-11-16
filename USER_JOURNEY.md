@@ -73,7 +73,7 @@ flowchart TD
 | 3 | `acceso.html` · Google | Ventana de Google | `signInWithPopup` (el redirect falla en GitHub Pages por ser otro dominio) | — |
 | 4 | `acceso.html` · Alta | Nombre, teléfono, dirección, código de invitación | Lote: perfil + cerrojo del teléfono + código propio | `validNewCustomer` + `validClaim`: teléfono libre, email = el de Google, sin ñapas ni compras |
 | 5 | `acceso.html` · Bienvenida | Tarjeta «Instala Pachoncito» | Android: `beforeinstallprompt`. iOS: guía de 2 pasos | — |
-| 6 | `index.html` | Carta con sus datos | `buildOrder()` + `addDoc(orders)` | `validNewOrder` + uid propio + teléfono = el vinculado |
+| 6 | `index.html` | Carta con sus datos y, en su primer pedido web, «Regalo de bienvenida · 1 × Pandebono Clásico · Gratis» | `buildOrder()` + `placeOrder()`: pedido + cerrojos `welcomeGifts/{uid}` (y `/{teléfono}`) en el mismo lote | `validNewOrder` + uid propio + teléfono = el vinculado; con `welcomeGift`, `validWelcomeGift`: regalo activo, sin pedidos entregados y cerrojos nuevos |
 | 7 | Panel (al entregar) | — | El obrador confirma el teléfono (`phoneVerified`); si vino invitado, su recomendador gana 1 ñapa | Solo el obrador escribe ñapas y verificación |
 
 ---
@@ -141,6 +141,7 @@ flowchart TD
 | `orders` | Crear con su uid y su teléfono; leer los suyos | Igual, con `test: true` | Todo | — |
 | `reviews` | Crear (con compra), una por producto | Igual, con `test: true` | Premiar / borrar | Leer |
 | `reviewAuthors` | Crear la suya | Crear la suya | Leer / borrar | — |
+| `welcomeGifts` | Leer el suyo y el de su teléfono; crearlos junto a su primer pedido web | Igual, solo el de la cuenta | Todo (preparar / borrar los de prueba) | — |
 | `admins` | — | — | Leer la suya | — |
 
 ## Parámetros de URL

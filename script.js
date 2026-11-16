@@ -1,9 +1,11 @@
-import { addDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { mountEnvBanner } from "./env.js";
 import { mountFaq } from "./faq.js";
 import { db } from "./firebase.js";
 import { hydrateIcons } from "./icons.js";
-import { buildOrder, normalizeOrder, priceOrder } from "./orders.js";
+import {
+    buildOrder, missingWelcomeLocks, normalizeOrder, placeOrder, priceOrder, WELCOME_GIFT_LABEL, WELCOME_GIFT_PRODUCT, welcomeLockIds
+} from "./orders.js";
 import { mountInstallPrompt, registerServiceWorker } from "./pwa.js";
 import { playReward, playSuccess, playTap } from "./sound.js";
 import { requireCustomer } from "./session.js";
@@ -33,6 +35,15 @@ let napasToRedeem = 0;
 let storeOpen = true;      // settings/store: el obrador puede estar en descanso
 let phoneBlocked = false;  // cuenta antigua con un teléfono que ya no es válido
 
+// Regalo de bienvenida: 1 clásico gratis en el primer pedido web. firestore.rules (validWelcomeGift) es quien decide;
+// aquí solo se muestra cuando el cliente cumple las mismas condiciones.
+const welcome = {
+    active: false,       // settings/store.welcomeGift
+    lockIds: welcomeLockIds(session.uid, profile.phone, session.isTest),
+    missing: null,       // cerrojos welcomeGifts que aún no existen (null = sin consultar o reglas antiguas)
+    hasOrders: true      // ya tiene algún pedido web (hasta comprobarlo, se asume que sí)
+};
+
 mountTopNav(profile);
 mountInstallPrompt($('installSlot'));
 
@@ -47,20 +58,54 @@ for (let minutes = 6 * 60; minutes <= 17 * 60 + 30; minutes += 30) {
     $('hora').append(new Option(slot, slot));
 }
 
-// Ñapas que puede canjear: su saldo menos las ya reservadas en pedidos aún sin entregar
-async function loadAvailableNapas() {
-    const balance = profile.napaCredits || 0;
-    if (!balance) return 0;
+// Pedidos web del cliente, o null si no se pudieron consultar
+async function loadMyOrders() {
     try {
         const snap = await getDocs(query(collection(db, 'orders'), where('uid', '==', session.uid)));
-        const reserved = snap.docs.map(normalizeOrder)
-            .filter(order => OPEN_STATUSES.includes(order.status))
-            .reduce((sum, order) => sum + (order.creditsToRedeem ?? balance), 0);
-        return Math.max(0, balance - reserved);
+        return snap.docs.map(normalizeOrder);
     } catch (error) {
         console.error('Error al consultar pedidos abiertos:', error);
-        return balance;
+        return null;
     }
+}
+
+// Ñapas que puede canjear: su saldo menos las ya reservadas en pedidos aún sin entregar
+function availableNapas(myOrders) {
+    const balance = profile.napaCredits || 0;
+    if (!balance || !myOrders) return balance;
+    const reserved = myOrders
+        .filter(order => OPEN_STATUSES.includes(order.status))
+        .reduce((sum, order) => sum + (order.creditsToRedeem ?? balance), 0);
+    return Math.max(0, balance - reserved);
+}
+
+// Mismas condiciones que validWelcomeGift(): regalo activo, ningún pedido entregado (sin el campo cuenta como 0),
+// ningún pedido web anterior y ninguno de sus cerrojos creado todavía
+function welcomeEligible(missing = welcome.missing) {
+    return welcome.active
+        && !(profile.completedOrders > 0)
+        && !welcome.hasOrders
+        && Array.isArray(missing)
+        && missing.length === welcome.lockIds.length;
+}
+
+function renderWelcomeGift() {
+    const show = welcomeEligible();
+    const hasItems = quantities.clasico + quantities.bocadillo > 0;
+    $('welcomeGift').hidden = !show;
+    $('welcomeGift').classList.toggle('is-included', show && hasItems);
+    $('welcomeGiftHint').textContent = hasItems
+        ? `1 × Pandebono ${PRODUCT_NAMES[WELCOME_GIFT_PRODUCT]} · va en este pedido`
+        : `Tu primer pedido en la web lleva 1 pandebono ${PRODUCT_NAMES[WELCOME_GIFT_PRODUCT].toLowerCase()} gratis`;
+    $('summaryGift').hidden = !(show && hasItems);
+}
+
+async function refreshWelcome() {
+    const [missing, myOrders] = await Promise.all([missingWelcomeLocks(db, welcome.lockIds), loadMyOrders()]);
+    welcome.missing = missing;
+    welcome.hasOrders = myOrders === null || myOrders.length > 0;
+    renderWelcomeGift();
+    return myOrders;
 }
 
 function renderNapaRedeem() {
@@ -90,6 +135,8 @@ function updateSummary() {
     const total = formatEUR(totalCents);
     if ($('totalPrice').textContent !== total) bump($('totalPrice'));
     $('totalPrice').textContent = total;
+
+    renderWelcomeGift();
 
     // Suena solo al ganar una ñapa más, no al perderla ni al repintar
     if (napaCount > lastNapaCount) playReward();
@@ -153,8 +200,10 @@ function syncSubmit() {
 }
 
 // Obrador en descanso: la carta se puede ver, pero contadores y reserva quedan desactivados
-function renderStore(open) {
+function renderStore(open, { welcomeGift = false } = {}) {
     storeOpen = open;
+    welcome.active = welcomeGift;
+    renderWelcomeGift();
     $('closedBanner').hidden = open;
     form.classList.toggle('is-closed', !open);
     form.querySelectorAll('.counter button, #tipoEntrega, #hora, #direccion').forEach(control => { control.disabled = !open; });
@@ -162,10 +211,11 @@ function renderStore(open) {
 }
 
 // Confirmación tras reservar, con el botón grande que lleva al seguimiento en vivo (Mi cuenta)
-function showOrderDone({ orderId, firstName, items, order, slot, redeemed }) {
+function showOrderDone({ orderId, firstName, items, order, slot, redeemed, gift }) {
     const lines = Object.entries(PRODUCT_NAMES)
         .filter(([key]) => items[key] > 0)
         .map(([key, name]) => `${items[key]} × ${name}`);
+    if (gift) lines.push(`1 × ${PRODUCT_NAMES[WELCOME_GIFT_PRODUCT]} · ${WELCOME_GIFT_LABEL} (gratis)`);
     lines.push(`${order.deliveryMethod === 'domicilio' ? 'Envío a domicilio' : 'Recogida en el obrador'} · domingo a las ${slot}`);
     if (order.napaCount > 0) lines.push(`${order.napaCount} ${order.napaCount === 1 ? 'ñapa' : 'ñapas'} de regalo`);
     if (redeemed > 0) lines.push(`${redeemed} ${redeemed === 1 ? 'ñapa acumulada canjeada' : 'ñapas acumuladas canjeadas'}`);
@@ -203,10 +253,15 @@ form.addEventListener('submit', async event => {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Guardando pedido…';
 
+    let gift = false;
     try {
         const items = { ...quantities };
         const redeemed = napasToRedeem;
-        const ref = await addDoc(collection(db, 'orders'), buildOrder({
+        // Cerrojos del regalo, consultados justo antes de guardar: el primer pedido web los crea, lleve o no regalo
+        const missing = await missingWelcomeLocks(db, welcome.lockIds);
+        welcome.missing = missing;
+        gift = welcomeEligible(missing);
+        const orderData = buildOrder({
             uid: session.uid,
             name: nombre,
             phone: profile.phone,
@@ -215,8 +270,20 @@ form.addEventListener('submit', async event => {
             address: direccion,
             slot: hora,
             test: session.isTest,
-            creditsToRedeem: napasToRedeem
-        }));
+            creditsToRedeem: napasToRedeem,
+            welcomeGift: gift
+        });
+        let ref;
+        try {
+            ref = await placeOrder(db, orderData, missing || []);
+        } catch (error) {
+            // Un pedido sin regalo nunca debe fallar por los cerrojos: se guarda como en la versión anterior
+            if (gift || !missing?.length || error?.code !== 'permission-denied') throw error;
+            console.warn('Pedido guardado sin cerrojo de bienvenida:', error);
+            ref = await placeOrder(db, orderData, []);
+        }
+        welcome.missing = [];
+        welcome.hasOrders = true;
         napasAvailable -= napasToRedeem;
         napasToRedeem = napasAvailable;
         renderNapaRedeem();
@@ -232,9 +299,15 @@ form.addEventListener('submit', async event => {
 
         playSuccess();
         showMessage(message, `Pedido reservado, ${nombre.split(' ')[0]}. Te esperamos el domingo; puedes seguirlo en «Mi cuenta».`, 'success');
-        showOrderDone({ orderId: ref.id, firstName: nombre.split(' ')[0], items, order, slot: hora, redeemed });
+        showOrderDone({ orderId: ref.id, firstName: nombre.split(' ')[0], items, order, slot: hora, redeemed, gift });
     } catch (error) {
         console.error('Error al guardar el pedido:', error);
+        if (gift && storeOpen && error?.code === 'permission-denied') {
+            // El regalo ya no estaba disponible (otra pestaña, o el obrador lo pausó): se actualiza y no se guarda nada
+            await refreshWelcome();
+            fail('No hemos podido aplicar el regalo de bienvenida: ya no está disponible para tu cuenta. Revisa tu pedido y vuelve a reservar.');
+            return;
+        }
         fail(!storeOpen
             ? 'El obrador acaba de entrar en descanso: no hay reservas activas. ¡Volvemos pronto!'
             : 'No hemos podido guardar tu pedido. Revisa la conexión y vuelve a intentarlo; si sigue fallando, escríbenos.');
@@ -254,6 +327,6 @@ if (!session.isTest && !validateMobile(profile.phone).phone) {
     showMessage(message, 'El teléfono vinculado a tu cuenta no es un móvil español válido. Escríbenos por Instagram para corregirlo y poder reservar.', 'error');
 }
 watchStore(db, renderStore);
-napasAvailable = await loadAvailableNapas();
+napasAvailable = availableNapas(await refreshWelcome());
 napasToRedeem = napasAvailable;
 renderNapaRedeem();
