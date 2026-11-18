@@ -7,6 +7,38 @@ import { DELIVERY_CENTS, NAPA_EVERY_CENTS, normalizePhone, PRICES_CENTS } from "
 
 export const PICKUP_ADDRESS = 'Recogida en local';
 
+// ---------- Estados del pedido ----------
+// En Firestore: pending → preparing → (ready | delivering) → completed, o rejected.
+// «delivering» (En reparto) solo existe en pedidos a domicilio mientras el repartidor comparte su ubicación.
+export const CUSTOMER_STATUS = {
+    pending: { text: 'Recibido', className: 'status-pending' },
+    preparing: { text: 'En preparación', className: 'status-preparing' },
+    ready: { text: 'Listo', className: 'status-ready' },
+    delivering: { text: 'En reparto', className: 'status-delivering' },
+    completed: { text: 'Entregado', className: 'status-completed' },
+    rejected: { text: 'Cancelado', className: 'status-rejected' }
+};
+
+// Texto del estado para el cliente: «Listo» depende de si lo recoge o se lo llevamos
+export function customerStatus(order) {
+    const info = CUSTOMER_STATUS[order.status] || CUSTOMER_STATUS.pending;
+    if (order.status !== 'ready') return info;
+    return { ...info, text: order.deliveryMethod === 'domicilio' ? 'Listo para salir' : 'Listo para recoger' };
+}
+
+// Pasos de la barra de progreso de seguimiento.html
+export function trackingSteps(order) {
+    const home = order.deliveryMethod === 'domicilio';
+    const steps = [
+        { key: 'received', label: 'Recibido' },
+        { key: 'preparing', label: 'En preparación' },
+        { key: 'onTheWay', label: home ? 'En reparto' : 'Listo para recoger' },
+        { key: 'done', label: 'Entregado' }
+    ];
+    const index = { pending: 0, preparing: 1, ready: home ? 1 : 2, delivering: 2, completed: 3 }[order.status] ?? 0;
+    return steps.map((step, i) => ({ ...step, state: i < index ? 'done' : i === index ? 'current' : 'next' }));
+}
+
 export function priceOrder(items, deliveryMethod) {
     const subtotalCents = items.clasico * PRICES_CENTS.clasico + items.bocadillo * PRICES_CENTS.bocadillo;
     const deliveryCents = deliveryMethod === 'domicilio' ? DELIVERY_CENTS : 0;

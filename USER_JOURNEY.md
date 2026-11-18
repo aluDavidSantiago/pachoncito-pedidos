@@ -141,6 +141,7 @@ flowchart TD
 | `orders` | Crear con su uid y su teléfono; leer los suyos | Igual, con `test: true` | Todo | — |
 | `reviews` | Crear (con compra), una por producto | Igual, con `test: true` | Premiar / borrar | Leer |
 | `reviewAuthors` | Crear la suya | Crear la suya | Leer / borrar | — |
+| `tracking` | Leer el de SU pedido mientras está en reparto | Igual | Todo (crear al salir, borrar al entregar) | — |
 | `welcomeGifts` | Leer el suyo y el de su teléfono; crearlos junto a su primer pedido web | Igual, solo el de la cuenta | Todo (preparar / borrar los de prueba) | — |
 | `admins` | — | — | Leer la suya | — |
 

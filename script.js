@@ -223,7 +223,7 @@ function showOrderDone({ orderId, firstName, items, order, slot, redeemed, gift 
 
     $('orderDoneLead').textContent = `Gracias, ${firstName}. Ya lo tenemos apuntado para el domingo.`;
     $('orderDoneSummary').replaceChildren(...lines.map(text => el('li', { text })));
-    $('orderDoneTrack').href = `cuenta.html?pedido=${encodeURIComponent(orderId)}#historial`;
+    $('orderDoneTrack').href = `seguimiento.html?pedido=${encodeURIComponent(orderId)}`;
     $('orderDone').showModal();
 }
 

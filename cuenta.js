@@ -4,7 +4,7 @@ import { mountEnvBanner } from "./env.js";
 import { mountFaq } from "./faq.js";
 import { db } from "./firebase.js";
 import { hydrateIcons } from "./icons.js";
-import { normalizeOrder, WELCOME_GIFT_LABEL, WELCOME_GIFT_PRODUCT } from "./orders.js";
+import { customerStatus, normalizeOrder, WELCOME_GIFT_LABEL, WELCOME_GIFT_PRODUCT } from "./orders.js";
 import { mountInstallPrompt, registerServiceWorker } from "./pwa.js";
 import { endSession, requireCustomer } from "./session.js";
 import { el, formatDate, formatEUR, PRODUCT_NAMES, showMessage } from "./shared.js";
@@ -20,13 +20,6 @@ const { session, profile } = await requireCustomer();
 mountTopNav(profile);
 const $ = id => document.getElementById(id);
 
-const STATUS = {
-    pending: ['Pendiente', 'status-pending'],
-    preparing: ['En preparación', 'status-preparing'],
-    ready: ['Listo', 'status-ready'],
-    completed: ['Entregado', 'status-completed'],
-    rejected: ['Rechazado', 'status-rejected']
-};
 
 $('helloTitle').textContent = `Hola, ${profile.name.split(' ')[0]}`;
 $('accountPhone').textContent = [
@@ -77,7 +70,8 @@ function itemsText(items = {}) {
 }
 
 function orderItem(order) {
-    const [statusText, statusClass] = STATUS[order.status] || STATUS.pending;
+    const { text: statusText, className: statusClass } = customerStatus(order);
+    const open = !['completed', 'rejected'].includes(order.status);
     return el('article', { className: 'review-card' },
         el('div', { className: 'review-meta' },
             el('span', { text: formatDate(order.createdAt) }),
@@ -96,6 +90,13 @@ function orderItem(order) {
             : null,
         redeemedText(order)
             ? el('p', { className: 'meta-success', text: redeemedText(order) })
+            : null,
+        // Seguimiento en vivo (y mapa del repartidor cuando está en reparto)
+        open
+            ? el('a', {
+                className: `btn ${order.status === 'delivering' ? 'btn-primary' : 'btn-secondary'} btn-small order-track-link`,
+                href: `seguimiento.html?pedido=${encodeURIComponent(order.id)}`
+            }, order.status === 'delivering' ? 'Ver el reparto en el mapa' : 'Seguir mi pedido')
             : null
     );
 }
@@ -138,7 +139,7 @@ function watchOrders() {
             tracked.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
         }
         if (changed.length) {
-            const [statusText] = STATUS[changed[0].status] || STATUS.pending;
+            const { text: statusText } = customerStatus(changed[0]);
             toast(`Tu pedido ha cambiado: ${statusText}.`, 'success');
         }
     }, error => {

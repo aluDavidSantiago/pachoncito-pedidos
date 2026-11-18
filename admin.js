@@ -13,6 +13,7 @@ import {
     ensureCostData, importCatalog, parseEuros, UNITS_PER_BATCH, renderCostMonitor, renderShoppingList, unitCosts,
     updateCostSettings, updateIngredientSpec, updatePackPrice, watchCostData
 } from "./admin-cost-monitor.js";
+import { createDelivery } from "./admin-delivery.js";
 import { adminAuth, adminDb as db } from "./admin-firebase.js";
 import { mountEnvBanner, TEST_CUSTOMERS, TEST_PHONES_LABEL, USE_EMULATORS } from "./env.js";
 import { hydrateIcons, icon } from "./icons.js";
@@ -34,13 +35,14 @@ const STATUS = {
     pending: { text: 'Pendiente', action: 'Pendiente', className: 'status-pending' },
     preparing: { text: 'En preparación', action: 'Preparando', className: 'status-preparing' },
     ready: { text: 'Listo', action: 'Listo', className: 'status-ready' },
+    delivering: { text: 'En reparto', action: 'En reparto', className: 'status-delivering' },
     completed: { text: 'Entregado', action: 'Entregado', className: 'status-completed' },
     rejected: { text: 'Cancelado', action: 'Cancelar', className: 'status-rejected' }
 };
 
 const TABS = {
     pendientes: ['pending', 'preparing'],
-    listos: ['ready'],
+    listos: ['ready', 'delivering'],
     completados: ['completed'],
     cancelados: ['rejected']
 };
@@ -51,6 +53,14 @@ let reviews = [];
 let costData = null;
 let unsubscribers = [];
 const filters = { sunday: currentSundayKey(), tab: 'pendientes', search: '' };
+
+// Reparto en directo (admin-delivery.js): «Salgo a repartir», ubicación, tiempo de llegada y «Entregado»
+const delivery = createDelivery({
+    db,
+    root: document.getElementById('deliveryPanel'),
+    onDeliver: (order, button) => changeStatus(order, 'completed', button),
+    toast
+});
 
 // ---------- Vistas ----------
 
@@ -322,6 +332,7 @@ $('storeOpenToggle').addEventListener('change', async event => {
 });
 
 function stopListeners() {
+    delivery.stop();
     unsubscribers.forEach(unsubscribe => unsubscribe());
     unsubscribers = [];
     orders = [];
@@ -334,6 +345,7 @@ function renderAll() {
     renderSundayOptions();
     renderProduction();
     renderOrders();
+    delivery.update(orders, ordersOfSunday());
 }
 
 // ---------- Domingos de entrega ----------
@@ -381,6 +393,7 @@ $('sundaySelect').addEventListener('change', event => {
     filters.sunday = event.target.value;
     renderProduction();
     renderOrders();
+    delivery.update(orders, ordersOfSunday());
 });
 
 const ordersOfSunday = () => (filters.sunday === 'all' ? orders : orders.filter(o => orderSunday(o) === filters.sunday));
@@ -411,8 +424,8 @@ function creditsByOrder(list) {
 
 let orderCredits = new Map();
 
-// Estados que ya salieron del horno: «Listo» y «Entregado». Pendiente y En preparación faltan por hornear.
-const BAKED = ['ready', 'completed'];
+// Estados que ya salieron del horno: «Listo», «En reparto» y «Entregado». Pendiente y En preparación faltan por hornear.
+const BAKED = ['ready', 'delivering', 'completed'];
 
 function productionOf(list) {
     const p = { clasicos: 0, bocadillos: 0, napas: 0, units: 0, pendingUnits: 0, bakedUnits: 0, ingresosCents: 0 };
@@ -543,7 +556,7 @@ function orderCard(order) {
     );
 
     const actions = el('div', { className: 'actions-bar' },
-        Object.entries(STATUS).map(([key, info]) => el('button', {
+        Object.entries(STATUS).filter(([key]) => key !== 'delivering').map(([key, info]) => el('button', {
             type: 'button',
             className: `btn btn-small${key === 'rejected' ? ' btn-danger' : ''}`,
             disabled: isClosed || key === order.status,
@@ -581,6 +594,7 @@ function renderOrders() {
 }
 
 async function changeStatus(order, newStatus, button) {
+    const wasDelivering = order.status === 'delivering';
     try {
         if (newStatus === 'completed') {
             const ok = confirm(`¿Marcar como entregado?\n\nAl hacerlo confirmas que el teléfono ${order.phone || ''} es de este cliente. `
@@ -600,6 +614,8 @@ async function changeStatus(order, newStatus, button) {
             await updateDoc(doc(db, 'orders', order.id), { status: newStatus });
             toast(`${order.customerName || 'Pedido'}: ${STATUS[newStatus].text.toLowerCase()}.`, 'success');
         }
+        // Sale del reparto (entregado, cancelado…): su seguimiento y la ubicación se borran
+        if (wasDelivering && newStatus !== 'delivering') await delivery.forget(order.id);
     } catch (error) {
         console.error('Error al actualizar estado:', error);
         toast('No se pudo actualizar el pedido.', 'error');
@@ -609,6 +625,7 @@ async function changeStatus(order, newStatus, button) {
 async function deleteOrder(orderId) {
     if (!confirm('¿Seguro que quieres eliminar este pedido permanentemente?')) return;
     try {
+        if (delivery.isDelivering(orderId)) await delivery.forget(orderId);
         await deleteDoc(doc(db, 'orders', orderId));
         toast('Pedido eliminado.');
     } catch (error) {

@@ -64,7 +64,7 @@ export async function clearTestData(db) {
         if (phone) refs.push(doc(db, 'phoneClaims', phone));
         if (referralCode) refs.push(doc(db, 'referralCodes', referralCode));
     });
-    orders.forEach(snap => refs.push(snap.ref));
+    orders.forEach(snap => refs.push(snap.ref, doc(db, 'tracking', snap.id)));
     reviews.forEach(snap => refs.push(snap.ref, doc(db, 'reviewAuthors', snap.id)));
     legacyOrders.forEach(snap => refs.push(snap.ref));
     welcomeLocks.forEach(snap => refs.push(snap.ref));
