@@ -10,7 +10,7 @@
     <link rel="icon" href="icons/favicon-light-48.png" media="(prefers-color-scheme: light)">
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     <title>Pachoncito | Obrador</title>
-    <link rel="stylesheet" href="style.css?v=2.4.1">
+    <link rel="stylesheet" href="style.css?v=2.5.0">
 </head>
 <body class="admin-page">
     <div class="admin-container">
@@ -117,6 +117,17 @@
                         <span class="kpi-label"><span data-icon="trend"></span>Beneficio</span>
                         <strong class="kpi-value profit" id="kpiBeneficio">0,00 €</strong>
                     </div>
+                </div>
+            </section>
+
+            <!-- Reparto en directo (admin-delivery.js): ubicación del repartidor y tiempo de llegada para cada cliente -->
+            <section class="dash-section" aria-labelledby="deliveryTitle">
+                <div class="dash-section-head">
+                    <h2 id="deliveryTitle" class="section-title">Reparto</h2>
+                    <span class="delivery-status" id="deliveryStatus" data-state="idle">Sin reparto</span>
+                </div>
+                <div id="deliveryPanel" class="delivery-panel" aria-live="polite">
+                    <p class="loading-state">Cargando pedidos…</p>
                 </div>
             </section>
 
@@ -240,6 +251,6 @@
         </div>
     </dialog>
 
-    <script type="module" src="admin.js?v=2.4.1"></script>
+    <script type="module" src="admin.js?v=2.5.0"></script>
 </body>
 </html>

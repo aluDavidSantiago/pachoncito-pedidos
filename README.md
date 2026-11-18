@@ -23,9 +23,12 @@ Plataforma web desarrollada para la gestión, procesamiento y control de pedidos
 | `index.html` + `script.js` | Carta y pedido (requiere sesión) |
 | `acceso.html` + `acceso.js` | Acceso con Google, alta del cliente con vinculación de teléfono e invitación a instalar |
 | `cuenta.html` + `cuenta.js` | Mi cuenta: ñapas, historial de pedidos y código de invitación |
+| `seguimiento.html` + `seguimiento.js` | Seguimiento de un pedido en vivo: estado y, en reparto, mapa con el repartidor y tiempo de llegada |
 | `resenas.html` + `resenas.js` | Valoraciones anónimas (una por cliente y producto) |
 | `admin.html` + `admin.js` | Panel del obrador (email y contraseña) |
 | `admin-firebase.js` | Instancia de Firebase **exclusiva del panel**: su sesión nunca se mezcla con la de los clientes |
+| `admin-delivery.js` | Reparto en directo: «Salgo a repartir», envío de la ubicación, tiempo de llegada (OSRM) y «Entregado» |
+| `geo.js` | Distancias y tiempo de llegada en línea recta (compartido por panel y seguimiento) |
 | `admin-cost-monitor.js` | Monitor de costes (solo lógica; los datos están en Firestore, solo para el obrador): proveedores, precio actual frente al anterior, margen por pandebono y lista de la compra |
 | `admin-biometric.js` | Desbloqueo del panel con Face ID / Touch ID / huella (WebAuthn) sobre la sesión guardada en el dispositivo |
 | `ui.js` / `icons.js` / `faq.js` | Interfaz común: diálogos animados, avisos, iconos SVG y preguntas frecuentes |
@@ -90,6 +93,16 @@ el panel (**📱 Teléfonos vinculados**).
 * **Por valorar:** 1 ñapa por cada pedido entregado que el cliente valora (elige el pedido y el sabor). La reseña usa el id del pedido (`reviews/{idPedido}`) y solo se crea una vez; las reglas (`isReviewReward` + `reviewableOrder`) exigen pedido propio, entregado, con ese sabor, y exactamente +1 en el mismo lote.
 * Al hacer el pedido, el cliente elige cuántas de sus ñapas acumuladas canjea (de 0 al total, campo opcional `creditsToRedeem`). Las elegidas aparecen en el panel y se descuentan al entregarlo; las demás siguen en su saldo. Los pedidos antiguos sin ese campo canjean todo el saldo, como antes.
 * Los clientes anteriores a las cuentas de Google (identificados por teléfono) se fusionan automáticamente con su nueva cuenta al entregarles el primer pedido.
+
+## Reparto en directo
+
+* **Estados:** Recibido (`pending`) → En preparación (`preparing`) → En reparto (`delivering`, solo a domicilio) → Entregado (`completed`). Los de recogida pasan por «Listo para recoger» (`ready`).
+* **Panel → Reparto → «Salgo a repartir»:** marca los pedidos a domicilio del domingo que llevas. Pasan a «En reparto» y por cada uno se crea `tracking/{idPedido}` con su destino. El móvil envía su posición (`watchPosition`) cada ~8 s si se mueve (cada 30 s si está parado) y mantiene la pantalla encendida (Wake Lock).
+* **Tiempo de llegada:** una consulta por minuto a [OSRM](https://project-osrm.org/) (demo pública, gratis) para todas las direcciones; si falla, línea recta a 25 km/h con un 30 % más de recorrido.
+* **Direcciones:** se sitúan una sola vez al salir con [Nominatim](https://nominatim.org/) (OpenStreetMap) y se guardan en el pedido (`destination`). Si no se encuentra, el cliente ve al repartidor pero no el tiempo de llegada.
+* **Privacidad:** la ubicación solo vive en `tracking/{idPedido}` mientras el pedido está en reparto; se **borra** al marcar «Entregado» o «Terminar reparto» (los no entregados vuelven a «Listo»). Cada cliente solo puede leer el de su pedido (`firestore.rules`). Nominatim y OSRM solo los llama el móvil del repartidor, nunca los clientes.
+* **Cliente:** `seguimiento.html?pedido=…` (enlazado desde la confirmación y «Mi cuenta») muestra el estado y, en reparto, un mapa Leaflet + OpenStreetMap que se actualiza solo con `onSnapshot`.
+* **Importante:** con la pantalla apagada o en otra app, el navegador deja de dar la ubicación; al volver al panel se reanuda sola.
 
 ## Regalo de bienvenida
 

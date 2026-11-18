@@ -20,6 +20,9 @@ rules_version = '2';
 //   welcomeGifts/{teléfono}  a su primer pedido web (con o sin regalo) y no se edita ni se borra desde la web. El de
 //                            teléfono evita repetir regalo si un número liberado se vincula a otra cuenta (las
 //                            cuentas de prueba no lo usan: comparten teléfonos de prueba).
+//   tracking/{idPedido}      Reparto en directo: posición del repartidor, destino y tiempo estimado de ESE pedido.
+//                            Solo existe mientras el pedido está «En reparto» (el panel lo crea al salir y lo borra
+//                            al entregar o al terminar el reparto). Solo lo lee el cliente dueño del pedido.
 //   reviews/{idPedido}       Públicas y anónimas. Una por pedido entregado (el cliente elige qué sabor valora)
 //                            y cada una da 1 ñapa. Las antiguas (uid_producto) y las de prueba (seed_*) se conservan.
 //   reviewAuthors/{id}       Privado. Vincula cada reseña con su autor (solo lo ve el obrador).
@@ -355,6 +358,16 @@ service cloud.firestore {
       // Solo "create": si ya existe, el lote entero se rechaza
       allow create: if signedIn() && validWelcomeLock(lockId);
       // Panel: preparar los cerrojos de quienes ya tenían pedidos y borrar los de prueba
+      allow read, write: if isAdmin();
+    }
+
+    // ---------- Seguimiento del reparto ----------
+
+    // El cliente solo lee el seguimiento de SU pedido (get de un documento concreto; nunca listar).
+    // Solo el panel lo escribe: así la ubicación del repartidor no la ve nadie más ni fuera del reparto.
+    match /tracking/{orderId} {
+      allow get: if signedIn()
+        && get(orderPath(orderId)).data.get('uid', '') == request.auth.uid;
       allow read, write: if isAdmin();
     }
 

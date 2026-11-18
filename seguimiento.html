@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es" class="auth-pending">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#f5efe6" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#110e0c" media="(prefers-color-scheme: dark)">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icons/favicon-dark-48.png" media="(prefers-color-scheme: dark)">
+    <link rel="icon" href="icons/favicon-light-48.png" media="(prefers-color-scheme: light)">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Pachoncito">
+    <title>Pachoncito | Seguimiento del pedido</title>
+    <!-- Mapa: Leaflet + OpenStreetMap (gratis, sin clave). Versión fija y firma de integridad. -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <link rel="stylesheet" href="style.css?v=2.5.0">
+    <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+</head>
+<body>
+    <div class="container">
+        <nav class="top-nav" aria-label="Navegación principal">
+            <a href="cuenta.html" class="nav-account" aria-label="Mi cuenta y ñapas acumuladas">
+                <span class="nav-avatar"><span data-icon="user"></span></span>
+                <span class="nav-account-text">
+                    <span class="nav-name" data-nav-name>Mi cuenta</span>
+                    <span class="nav-napas"><span data-icon="gift"></span><strong data-nav-napas>0</strong><span class="nav-napas-word"> ñapas</span></span>
+                </span>
+            </a>
+            <div class="nav-actions">
+                <button type="button" class="nav-sound" data-sound-toggle aria-pressed="true" aria-label="Sonido de la interfaz"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11"/></svg></button>
+                <a href="index.html#pedido" class="nav-cta" data-nav-order><span data-icon="bread"></span>Hacer pedido</a>
+            </div>
+        </nav>
+
+        <header class="site-header">
+            <div class="logo-container">
+                <a href="index.html"><picture class="brand-picture"><source srcset="icons/logo-tinta.png" media="(prefers-color-scheme: light)"><img src="icons/logo-blanco.png" alt="Pachoncito — volver a pedidos" class="brand-logo" width="300" height="73"></picture></a>
+            </div>
+            <div class="badge">Seguimiento del pedido</div>
+        </header>
+
+        <main class="page-centered">
+            <p id="trackLoading" class="loading-state">Cargando tu pedido…</p>
+            <p id="trackMessage" class="form-message" role="status" aria-live="polite" hidden></p>
+
+            <div id="trackView" hidden>
+                <!-- Estado actual (seguimiento.js): se actualiza solo con onSnapshot -->
+                <section class="page-section track-hero" aria-labelledby="trackTitle">
+                    <span class="badge-status" id="trackBadge"></span>
+                    <h2 id="trackTitle">Tu pedido</h2>
+                    <p class="section-desc" id="trackLead"></p>
+                    <ol class="track-steps" id="trackSteps" aria-label="Progreso del pedido"></ol>
+                </section>
+
+                <!-- Reparto en directo: solo con el pedido «En reparto» y mientras el repartidor comparte su ubicación -->
+                <section class="page-section track-live" id="trackLive" aria-labelledby="liveTitle" hidden>
+                    <div class="track-eta" aria-live="polite">
+                        <span class="track-eta-icon"><span data-icon="clock"></span></span>
+                        <div class="track-eta-text">
+                            <h2 id="liveTitle">Llega en <strong id="etaMinutes">—</strong></h2>
+                            <span class="hint" id="etaHint">Calculando…</span>
+                        </div>
+                    </div>
+                    <div class="track-map" id="trackMap" role="img" aria-label="Mapa con la posición del repartidor y tu dirección"></div>
+                    <p class="hint track-map-note" id="mapNote"></p>
+                </section>
+
+                <section class="page-section" aria-labelledby="summaryTitle">
+                    <h2 id="summaryTitle">Resumen</h2>
+                    <ul class="track-summary" id="trackSummary"></ul>
+                </section>
+
+                <section class="page-section">
+                    <a href="cuenta.html#historial" class="btn btn-secondary">Ver todos mis pedidos</a>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script type="module" src="seguimiento.js?v=2.5.0"></script>
+</body>
+</html>
