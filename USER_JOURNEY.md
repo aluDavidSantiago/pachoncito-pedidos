@@ -68,7 +68,7 @@ flowchart TD
 
 | # | Pantalla | Qué ve el cliente | Qué ocurre por debajo | Regla que lo protege |
 |---|---|---|---|---|
-| 1 | Cualquier página de cliente | Nada (oculta con `.auth-pending`) | `requireCustomer()` no encuentra sesión y redirige con `location.replace` | — |
+| 1 | `index.html` (carta, pública) · o cualquier otra página de cliente | Carta con fotos y precios sin cuenta; al pulsar «Reservar», ir a entrar con la cesta en el enlace. Las demás páginas: nada (oculta con `.auth-pending`) | Carta: `getCustomer()` (sin redirigir). Resto: `requireCustomer()` redirige con `location.replace` | — |
 | 2 | `acceso.html` · Navegador interno | Instrucciones para abrir en Chrome/Safari | Detección por `userAgent` (Google bloquea su login en WebViews) | — |
 | 3 | `acceso.html` · Google | Ventana de Google | `signInWithPopup` (el redirect falla en GitHub Pages por ser otro dominio) | — |
 | 4 | `acceso.html` · Alta | Nombre, teléfono, dirección, código de invitación | Lote: perfil + cerrojo del teléfono + código propio | `validNewCustomer` + `validClaim`: teléfono libre, email = el de Google, sin ñapas ni compras |

@@ -1031,7 +1031,7 @@ input[type="radio"] {
 /* Foto de producto: marco listo para <img> (object-fit: cover); sin foto muestra el icono del pan */
 .product-photo {
     flex-shrink: 0;
-    width: 3.5rem;
+    width: 5.5rem;
     aspect-ratio: 1;
     display: grid;
     place-items: center;
@@ -1045,6 +1045,7 @@ input[type="radio"] {
 }
 
 .product-photo img {
+    display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -1129,7 +1130,7 @@ input[type="radio"] {
         align-items: center;
     }
     .product-main { display: contents; }
-    .product-photo { grid-row: span 2; width: clamp(4.5rem, 22vw, 6rem); }
+    .product-photo { grid-row: span 2; width: clamp(5.5rem, 27vw, 7rem); }
     .product-photo .icon { width: 2rem; height: 2rem; }
     .product-card .counter { justify-self: end; }
 }
@@ -3819,3 +3820,21 @@ body.has-env-banner .top-nav {
 @media (prefers-reduced-motion: reduce) {
     .delivery-gps-dot { animation: none; }
 }
+
+/* ---------- Carta pública (visitante sin cuenta) ---------- */
+
+.guest-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin: 0 0 0.875rem;
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+}
+
+.guest-note .icon { flex-shrink: 0; width: 1rem; height: 1rem; margin-top: 0.15rem; color: var(--accent); }
+.guest-note[hidden] { display: none; }
+
+/* Acceso desde Instagram: el «hazlo a mano» va pegado a sus pasos */
+#stepInApp .hint { margin-bottom: 0; }
+#stepInApp .hint + .info-list { margin-top: 0; }

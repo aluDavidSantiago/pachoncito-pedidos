@@ -5,7 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#f5efe6" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#110e0c" media="(prefers-color-scheme: dark)">
-    <meta name="description" content="Reserva tus pandebonos artesanales Pachoncito en Premià de Mar. Recogida en obrador o envío a domicilio los domingos.">
+    <meta name="description" content="Auténticos pandebonos colombianos en Premià de Mar, horneados cada domingo. Reserva online: recogida en el obrador o envío a domicilio.">
+    <link rel="canonical" href="https://pachoncito.es/">
+    <!-- Vista previa al compartir el enlace (Instagram, WhatsApp…) -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Pachoncito">
+    <meta property="og:locale" content="es_ES">
+    <meta property="og:url" content="https://pachoncito.es/">
+    <meta property="og:title" content="Pachoncito · Pandebonos colombianos en Premià de Mar">
+    <meta property="og:description" content="Recién horneados cada domingo. Reserva online y recógelos en el obrador o te los llevamos a casa.">
+    <meta property="og:image" content="https://pachoncito.es/img/og-pachoncito.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Pandebonos clásicos y con bocadillo de guayaba de Pachoncito">
+    <meta name="twitter:card" content="summary_large_image">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icons/favicon-dark-48.png" media="(prefers-color-scheme: dark)">
     <link rel="icon" href="icons/favicon-light-48.png" media="(prefers-color-scheme: light)">
@@ -15,7 +28,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Pachoncito">
     <title>Pachoncito | Pedidos</title>
-    <link rel="stylesheet" href="style.css?v=2.5.1">
+    <link rel="stylesheet" href="style.css?v=2.6.0">
 </head>
 <body>
     <div class="container">
@@ -54,12 +67,12 @@
         </section>
 
         <form id="orderForm" novalidate>
-            <div class="field">
+            <div class="field" data-member-only>
                 <label for="nombre">Nombre y Apellidos</label>
                 <input type="text" id="nombre" required maxlength="80" autocomplete="name" placeholder="Tu nombre completo">
             </div>
 
-            <div class="field">
+            <div class="field" data-member-only>
                 <label for="telefono">Teléfono / WhatsApp <span class="optional">(vinculado a tu cuenta)</span></label>
                 <input type="tel" id="telefono" readonly aria-readonly="true">
             </div>
@@ -69,8 +82,10 @@
             <div class="products-section" id="pedido">
                 <div class="product-card" data-card="clasico">
                     <div class="product-main">
-                        <!-- Para poner la foto: <img src="img/clasico.jpg" alt="" width="112" height="112"> en lugar del icono -->
-                        <div class="product-photo" aria-hidden="true"><span data-icon="bread"></span></div>
+                        <picture class="product-photo">
+                            <source srcset="img/clasico.webp" type="image/webp">
+                            <img src="img/clasico.jpg" alt="Dos pandebonos clásicos recién horneados" width="480" height="480" loading="eager" decoding="async">
+                        </picture>
                         <div class="product-info">
                             <h3>Clásico</h3>
                             <span class="product-sub">Receta tradicional de la casa</span>
@@ -87,8 +102,10 @@
 
                 <div class="product-card" data-card="bocadillo">
                     <div class="product-main">
-                        <!-- Para poner la foto: <img src="img/bocadillo.jpg" alt="" width="112" height="112"> en lugar del icono -->
-                        <div class="product-photo" aria-hidden="true"><span data-icon="bread"></span></div>
+                        <picture class="product-photo">
+                            <source srcset="img/bocadillo.webp" type="image/webp">
+                            <img src="img/bocadillo.jpg" alt="Pandebono abierto con su relleno de bocadillo de guayaba" width="480" height="480" loading="eager" decoding="async">
+                        </picture>
                         <div class="product-info">
                             <h3>Con Bocadillo</h3>
                             <span class="product-sub">Relleno de guayaba</span>
@@ -193,6 +210,9 @@
 
             <p id="formMessage" class="form-message" role="status" aria-live="polite" hidden></p>
 
+            <!-- Visitante (sin cuenta): al reservar se le pide entrar y la cesta le espera al volver (script.js) -->
+            <p class="guest-note" id="guestNote" hidden><span data-icon="lock"></span>Al reservar te pediremos entrar con tu cuenta de Google. Es un momento y tu cesta te espera.</p>
+
             <div class="summary">
                 <p class="summary-total">Total a pagar <strong id="totalPrice">0,00 €</strong>
                     <span class="summary-gift" id="summaryGift" hidden><span data-icon="gift"></span>+ Regalo de bienvenida</span></p>
@@ -224,6 +244,6 @@
         <button type="button" class="btn btn-link" id="orderDoneClose">Hacer otro pedido</button>
     </dialog>
 
-    <script type="module" src="script.js?v=2.5.1"></script>
+    <script type="module" src="script.js?v=2.6.0"></script>
 </body>
 </html>
