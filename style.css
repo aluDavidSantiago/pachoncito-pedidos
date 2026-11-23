@@ -3515,14 +3515,45 @@ body.has-env-banner .top-nav {
     gap: 0.75rem;
 }
 
+/* Mapa con el tiempo de llegada flotando encima (estilo app de reparto) */
+.track-map-wrap {
+    position: relative;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    box-shadow: var(--shadow-lg);
+    isolation: isolate;
+}
+
+.track-map {
+    height: clamp(340px, 60vh, 480px);
+    background: var(--bg);
+}
+
+.track-map.is-fallback {
+    height: 7rem;
+    background:
+        radial-gradient(circle at 30% 40%, var(--accent-soft), transparent 60%),
+        var(--surface-2);
+}
+
 .track-eta {
+    position: absolute;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: 0.75rem;
+    z-index: 2;
     display: flex;
     align-items: center;
     gap: 0.875rem;
-    padding: 0.875rem 1rem;
+    padding: 0.8rem 1rem;
     border-radius: var(--radius-md);
-    background: var(--accent-soft);
-    border: 1px solid var(--accent-border);
+    background: var(--surface-glass);
+    border: 1px solid var(--hairline);
+    box-shadow: var(--shadow-lg);
+    -webkit-backdrop-filter: blur(16px) saturate(1.5);
+    backdrop-filter: blur(16px) saturate(1.5);
 }
 
 .track-eta-icon {
@@ -3532,26 +3563,100 @@ body.has-env-banner .top-nav {
     width: 2.6rem;
     height: 2.6rem;
     border-radius: 50%;
-    background: var(--accent-fill);
+    background: linear-gradient(180deg, var(--accent-strong), var(--accent-fill));
     color: var(--on-accent);
+    box-shadow: var(--shadow-accent);
 }
 
-.track-eta-text { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
-.track-eta-text h2 { margin: 0; font-size: var(--fs-lg); }
+.track-eta-text { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.track-eta-text h2 { margin: 0; font-size: var(--fs-lg); line-height: 1.2; }
 .track-eta-text strong { color: var(--accent); }
+.track-eta-hint { font-size: var(--fs-xs); color: var(--text-muted); }
 
-.track-live.is-stale .track-eta { background: var(--surface-2); border-color: var(--border); }
+.track-live.is-stale .track-eta-icon { background: var(--surface-3); color: var(--text-muted); box-shadow: none; }
 
-.track-map {
-    height: clamp(280px, 52vh, 420px);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    border: 1px solid var(--border);
-    background: var(--surface-sunken);
-    z-index: 0;
+.map-recenter {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--hairline);
+    background: var(--surface-glass);
+    color: var(--accent);
+    box-shadow: var(--shadow-sm);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    cursor: pointer;
 }
+
+.map-recenter[hidden] { display: none; }
 
 .track-map-note { margin: 0; }
+
+/* Marcadores: repartidor (dorado, con halo que late) y dirección de entrega (alfiler guayaba) */
+/* MapLibre coloca cada marcador con position:absolute + transform: no se toca su posición */
+.map-pin { display: grid; place-items: center; }
+
+.map-pin-body {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    box-shadow: 0 8px 20px rgba(40, 25, 10, 0.35);
+}
+
+.map-pin-body .icon { width: 22px; height: 22px; stroke-width: 1.9; }
+
+.map-pin-courier .map-pin-body {
+    background: linear-gradient(180deg, var(--accent-strong), var(--accent-fill));
+    color: var(--on-accent);
+    border: 3px solid var(--surface);
+}
+
+.map-pin-courier .map-pin-halo {
+    position: absolute;
+    inset: -10px;
+    border-radius: 50%;
+    background: var(--accent-fill);
+    opacity: 0.25;
+    animation: pinHalo 2s var(--ease-out) infinite;
+}
+
+@keyframes pinHalo {
+    0% { transform: scale(0.6); opacity: 0.35; }
+    100% { transform: scale(1.4); opacity: 0; }
+}
+
+.map-pin-dest .map-pin-body {
+    width: 40px;
+    height: 40px;
+    border-radius: 50% 50% 50% 4px;
+    transform: rotate(-45deg);
+    background: var(--terracotta);
+    color: #fffcf7;
+    border: 3px solid var(--surface);
+}
+
+.map-pin-dest .map-pin-body .icon { transform: rotate(45deg); }
+.map-pin-dest .map-pin-halo { display: none; }
+
+/* Atribución obligatoria de OpenStreetMap / OpenFreeMap, discreta y con los colores de la web */
+.track-map .maplibregl-ctrl-attrib {
+    background: var(--surface-glass);
+    color: var(--text-muted);
+    font-size: 10px;
+}
+
+.track-map .maplibregl-ctrl-attrib a { color: var(--accent); }
+.track-map .maplibregl-ctrl-bottom-right { bottom: 5.6rem; }
 
 .track-summary {
     list-style: none;
@@ -3572,38 +3677,9 @@ body.has-env-banner .top-nav {
     font-weight: 600;
 }
 
-/* Marcadores del mapa (Leaflet divIcon) */
-.map-marker { background: none; border: none; }
-
-.map-courier,
-.map-dest {
-    display: grid;
-    place-items: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
-}
-
-.map-courier { background: var(--accent-fill); color: var(--on-accent); border: 3px solid var(--surface); }
-.map-dest { background: var(--surface); color: var(--terracotta); border: 3px solid var(--terracotta); }
-.map-courier .icon, .map-dest .icon { width: 22px; height: 22px; }
-
-.track-map .leaflet-control-attribution {
-    font-size: 10px;
-    background: var(--surface-glass);
-    color: var(--text-muted);
-}
-
-.track-map .leaflet-control-attribution a { color: var(--accent); }
-
-@media (prefers-color-scheme: dark) {
-    /* Mapa en tonos oscuros, a juego con la web */
-    .track-map .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.6); }
-}
-
 @media (prefers-reduced-motion: reduce) {
     .track-step.is-current .track-dot { animation: none; }
+    .map-pin-courier .map-pin-halo { animation: none; }
 }
 
 /* ---------- Reparto en directo (panel del obrador · admin-delivery.js) ---------- */

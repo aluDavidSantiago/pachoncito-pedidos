@@ -14,10 +14,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Pachoncito">
     <title>Pachoncito | Seguimiento del pedido</title>
-    <!-- Mapa: Leaflet + OpenStreetMap (gratis, sin clave). Versión fija y firma de integridad. -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-    <link rel="stylesheet" href="style.css?v=2.5.0">
-    <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Mapa: MapLibre + OpenFreeMap (gratis, sin clave), recoloreado con la paleta de la web (map-style.js). Versión fija y firma de integridad. -->
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" integrity="sha384-MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css?v=2.5.1">
+    <script defer src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js" integrity="sha384-SYKAG6cglRMN0RVvhNeBY0r3FYKNOJtznwA0v7B5Vp9tr31xAHsZC0DqkQ/pZDmj" crossorigin="anonymous"></script>
 </head>
 <body>
     <div class="container">
@@ -55,16 +55,20 @@
                     <ol class="track-steps" id="trackSteps" aria-label="Progreso del pedido"></ol>
                 </section>
 
-                <!-- Reparto en directo: solo con el pedido «En reparto» y mientras el repartidor comparte su ubicación -->
+                <!-- Reparto en directo: solo con el pedido «En reparto» y mientras el repartidor comparte su ubicación.
+                     Solo se muestra la posición del repartidor y la dirección de entrega; nunca la ubicación del cliente. -->
                 <section class="page-section track-live" id="trackLive" aria-labelledby="liveTitle" hidden>
-                    <div class="track-eta" aria-live="polite">
-                        <span class="track-eta-icon"><span data-icon="clock"></span></span>
-                        <div class="track-eta-text">
-                            <h2 id="liveTitle">Llega en <strong id="etaMinutes">—</strong></h2>
-                            <span class="hint" id="etaHint">Calculando…</span>
+                    <div class="track-map-wrap">
+                        <div class="track-map" id="trackMap" role="img" aria-label="Mapa con la posición del repartidor y tu dirección de entrega"></div>
+                        <button type="button" class="map-recenter" id="mapRecenter" aria-label="Volver a centrar el mapa" hidden><span data-icon="route"></span></button>
+                        <div class="track-eta" aria-live="polite">
+                            <span class="track-eta-icon"><span data-icon="car"></span></span>
+                            <div class="track-eta-text">
+                                <h2 id="liveTitle">Llega en <strong id="etaMinutes">—</strong></h2>
+                                <span class="track-eta-hint" id="etaHint">Calculando…</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="track-map" id="trackMap" role="img" aria-label="Mapa con la posición del repartidor y tu dirección"></div>
                     <p class="hint track-map-note" id="mapNote"></p>
                 </section>
 
@@ -80,6 +84,6 @@
         </main>
     </div>
 
-    <script type="module" src="seguimiento.js?v=2.5.0"></script>
+    <script type="module" src="seguimiento.js?v=2.5.1"></script>
 </body>
 </html>

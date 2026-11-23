@@ -29,6 +29,7 @@ Plataforma web desarrollada para la gestión, procesamiento y control de pedidos
 | `admin-firebase.js` | Instancia de Firebase **exclusiva del panel**: su sesión nunca se mezcla con la de los clientes |
 | `admin-delivery.js` | Reparto en directo: «Salgo a repartir», envío de la ubicación, tiempo de llegada (OSRM) y «Entregado» |
 | `geo.js` | Distancias y tiempo de llegada en línea recta (compartido por panel y seguimiento) |
+| `map-style.js` | Mapa del seguimiento con los colores de la web (OpenFreeMap recoloreado, claro y oscuro) y decodificador de rutas |
 | `admin-cost-monitor.js` | Monitor de costes (solo lógica; los datos están en Firestore, solo para el obrador): proveedores, precio actual frente al anterior, margen por pandebono y lista de la compra |
 | `admin-biometric.js` | Desbloqueo del panel con Face ID / Touch ID / huella (WebAuthn) sobre la sesión guardada en el dispositivo |
 | `ui.js` / `icons.js` / `faq.js` | Interfaz común: diálogos animados, avisos, iconos SVG y preguntas frecuentes |
@@ -98,10 +99,10 @@ el panel (**📱 Teléfonos vinculados**).
 
 * **Estados:** Recibido (`pending`) → En preparación (`preparing`) → En reparto (`delivering`, solo a domicilio) → Entregado (`completed`). Los de recogida pasan por «Listo para recoger» (`ready`).
 * **Panel → Reparto → «Salgo a repartir»:** marca los pedidos a domicilio del domingo que llevas. Pasan a «En reparto» y por cada uno se crea `tracking/{idPedido}` con su destino. El móvil envía su posición (`watchPosition`) cada ~8 s si se mueve (cada 30 s si está parado) y mantiene la pantalla encendida (Wake Lock).
-* **Tiempo de llegada:** una consulta por minuto a [OSRM](https://project-osrm.org/) (demo pública, gratis) para todas las direcciones; si falla, línea recta a 25 km/h con un 30 % más de recorrido.
-* **Direcciones:** se sitúan una sola vez al salir con [Nominatim](https://nominatim.org/) (OpenStreetMap) y se guardan en el pedido (`destination`). Si no se encuentra, el cliente ve al repartidor pero no el tiempo de llegada.
+* **Ruta y tiempo de llegada:** una vez por minuto, una consulta a [OSRM](https://project-osrm.org/) (demo pública, gratis) por pedido, separadas 1 s. Se guarda la ruta (`route`, polilínea) para dibujarla en dorado en el mapa del cliente. Si falla, línea recta a 25 km/h con un 30 % más de recorrido (línea discontinua).
+* **Direcciones:** se sitúan una sola vez al salir y se guardan en el pedido (`destination`). Se quita piso y puerta, se prueba la calle en castellano y en catalán («Calle Mayor» → «Carrer Mayor»), con y sin número, con [Nominatim](https://nominatim.org/) y, si no, con [Photon](https://photon.komoot.io/). Se descartan resultados a más de 15 km de Premià. Si no se encuentra, el cliente ve «Va de camino a tu casa» y la posición del repartidor, sin mensajes de error.
 * **Privacidad:** la ubicación solo vive en `tracking/{idPedido}` mientras el pedido está en reparto; se **borra** al marcar «Entregado» o «Terminar reparto» (los no entregados vuelven a «Listo»). Cada cliente solo puede leer el de su pedido (`firestore.rules`). Nominatim y OSRM solo los llama el móvil del repartidor, nunca los clientes.
-* **Cliente:** `seguimiento.html?pedido=…` (enlazado desde la confirmación y «Mi cuenta») muestra el estado y, en reparto, un mapa Leaflet + OpenStreetMap que se actualiza solo con `onSnapshot`.
+* **Cliente:** `seguimiento.html?pedido=…` (enlazado desde la confirmación y «Mi cuenta») muestra el estado y, en reparto, un mapa MapLibre + [OpenFreeMap](https://openfreemap.org/) (gratis, sin clave, uso comercial permitido) con los colores de la web, que se actualiza solo con `onSnapshot`: el repartidor se desliza, la ruta en dorado y el tiempo de llegada flotando encima. Solo aparecen la posición del repartidor y la dirección de entrega, nunca la ubicación del cliente.
 * **Importante:** con la pantalla apagada o en otra app, el navegador deja de dar la ubicación; al volver al panel se reanuda sola.
 
 ## Regalo de bienvenida

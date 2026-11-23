@@ -7,8 +7,8 @@
 // y cada cliente solo puede leer la de su pedido (firestore.rules · tracking).
 //
 // Servicios externos gratuitos, llamados SOLO desde este móvil (nunca desde los clientes):
-//   · Nominatim (OpenStreetMap): sitúa cada dirección una sola vez al salir (máx. 1 consulta por segundo).
-//   · OSRM (demo pública): tiempo en coche hasta todas las direcciones en una sola consulta por minuto.
+//   · Nominatim (OpenStreetMap), y Photon si Nominatim no la encuentra: sitúan cada dirección una sola vez al salir.
+//   · OSRM (demo pública): ruta y tiempo en coche hasta cada dirección, una vez por minuto (máx. 1 consulta por segundo).
 import {
     deleteDoc, doc, serverTimestamp, updateDoc, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -20,11 +20,21 @@ const SEND_EVERY_MS = 8000;        // como mucho, una posición cada 8 s…
 const SEND_MIN_MOVE_M = 10;        // …y solo si se ha movido 10 m
 const HEARTBEAT_MS = 30000;        // parado: se reenvía cada 30 s para que el cliente sepa que sigue conectado
 const ETA_EVERY_MS = 60000;        // tiempo estimado: una consulta a OSRM por minuto
-const OSRM_URL = 'https://router.project-osrm.org/table/v1/driving/';
+const OSRM_URL = 'https://router.project-osrm.org/route/v1/driving/';
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
+const PHOTON_URL = 'https://photon.komoot.io/api/';
 const TOWN = 'Premià de Mar';
+const TOWN_CENTER = { lat: 41.4917, lng: 2.3606 };
+const MAX_KM_FROM_TOWN = 15;       // un resultado más lejos es otro pueblo con una calle igual: se descarta
 // Caja aproximada de Premià de Mar y alrededores: da preferencia a resultados de la zona
 const VIEWBOX = '2.30,41.54,2.42,41.46';
+
+// Tipos de vía en castellano → catalán (en OpenStreetMap las calles de Premià están en catalán)
+const STREET_TYPES = [
+    [/^(c\/|c\.|cl\.?|calle)\s+/i, 'Carrer '], [/^(avda\.?|av\.?|avenida)\s+/i, 'Avinguda '], [/^(pza\.?|pl\.?|plaza)\s+/i, 'Plaça '],
+    [/^(pº|p\.º|paseo)\s+/i, 'Passeig '], [/^(camino)\s+/i, 'Camí '], [/^(pasaje|pje\.?)\s+/i, 'Passatge '], [/^(travesía|travesia)\s+/i, 'Travessera '],
+    [/^(carretera|ctra\.?)\s+/i, 'Carretera '], [/^(rambla)\s+/i, 'Rambla '], [/^(ronda)\s+/i, 'Ronda ']
+];
 
 const OPEN_FOR_DELIVERY = ['pending', 'preparing', 'ready'];
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -47,51 +57,105 @@ export function createDelivery({ db, root, onDeliver, toast }) {
     const candidates = () => sundayOrders.filter(o => o.deliveryMethod === 'domicilio' && OPEN_FOR_DELIVERY.includes(o.status));
     const watching = () => watchId !== null;
 
-    // ---------- Direcciones (Nominatim) ----------
+    // ---------- Direcciones (Nominatim y Photon) ----------
 
-    async function geocode(address) {
-        const q = new RegExp(TOWN.replace('à', '[àa]'), 'i').test(address) ? address : `${address}, ${TOWN}`;
-        const url = `${NOMINATIM_URL}?format=jsonv2&limit=1&countrycodes=es&accept-language=es&viewbox=${VIEWBOX}&q=${encodeURIComponent(q)}`;
-        try {
-            const response = await fetch(url);
-            if (!response.ok) return null;
-            const [hit] = await response.json();
-            return hit ? { lat: Number(hit.lat), lng: Number(hit.lon) } : null;
-        } catch (error) {
-            console.warn('No se pudo situar la dirección:', error);
-            return null;
-        }
+    // «Calle Mayor 12, 2º 1ª» o «Calle Mayor, 12, bajos» → { street: 'Calle Mayor', number: '12' }
+    function parseAddress(raw) {
+        const parts = String(raw || '').split(',').map(part => part.trim()).filter(Boolean);
+        let text = parts[0] || '';
+        // Número después de la coma: «Calle Mayor, 12»
+        const numberAfter = parts[1]?.match(/^(?:n[ºo°.]?\s*)?(\d+[a-z]?)\b/i);
+        if (numberAfter && !/\d/.test(text)) text += ` ${numberAfter[1]}`;
+        text = text
+            .replace(/\b(piso|planta|puerta|pta\.?|esc\.?|escalera|bajos?|ático|atico|entresuelo|principal)\b.*$/i, '')
+            .replace(/(\d+[a-z]?)\s+\d+\s*[ºª°].*$/i, '$1')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const match = text.match(/^(.*?)[\s,]+(?:n[ºo°.]?\s*)?(\d+[a-z]?)$/i) || text.match(/^(.*?)[\s,]+(?:n[ºo°.]?\s*)?(\d+[a-z]?)\b/i);
+        return match ? { street: match[1].trim(), number: match[2] } : { street: text, number: '' };
     }
 
-    // ---------- Tiempo estimado (OSRM, o línea recta) ----------
+    function catalanStreet(street) {
+        if (/^(carrer|avinguda|plaça|passeig|camí|passatge|travessera|carretera|rambla|ronda|via|riera)\b/i.test(street)) return street;
+        for (const [pattern, replacement] of STREET_TYPES) {
+            if (pattern.test(street)) return street.replace(pattern, replacement);
+        }
+        return `Carrer ${street}`;
+    }
 
+    const nearTown = point => point && distanceMeters(point, TOWN_CENTER) <= MAX_KM_FROM_TOWN * 1000;
+
+    async function nominatim(params) {
+        const url = `${NOMINATIM_URL}?format=jsonv2&limit=1&countrycodes=es&accept-language=es&viewbox=${VIEWBOX}&${params}`;
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        const [hit] = await response.json();
+        const point = hit ? { lat: Number(hit.lat), lng: Number(hit.lon) } : null;
+        return nearTown(point) ? point : null;
+    }
+
+    async function photon(query) {
+        const url = `${PHOTON_URL}?limit=1&lat=${TOWN_CENTER.lat}&lon=${TOWN_CENTER.lng}&q=${encodeURIComponent(query)}`;
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        const [hit] = (await response.json()).features || [];
+        const [lng, lat] = hit?.geometry?.coordinates || [];
+        const point = Number.isFinite(lat) ? { lat, lng } : null;
+        return nearTown(point) ? point : null;
+    }
+
+    // Prueba de más exacta a menos: con número y sin él, en castellano y en catalán; si nada, Photon.
+    // Sin número se sitúa la calle (aproximado, pero suficiente para el tiempo de llegada).
+    async function geocode(address) {
+        const { street, number } = parseAddress(address);
+        if (!street) return null;
+        const names = [...new Set([street, catalanStreet(street)])];
+        const attempts = [];
+        for (const name of names) {
+            if (number) attempts.push(() => nominatim(`street=${encodeURIComponent(`${number} ${name}`)}&city=${encodeURIComponent(TOWN)}`));
+        }
+        for (const name of names) attempts.push(() => nominatim(`street=${encodeURIComponent(name)}&city=${encodeURIComponent(TOWN)}`));
+        attempts.push(() => nominatim(`q=${encodeURIComponent(`${address}, ${TOWN}`)}`));
+        for (const name of names) attempts.push(() => photon(`${name} ${number}, ${TOWN}`.replace(/\s+,/, ',')));
+
+        for (let i = 0; i < attempts.length; i++) {
+            if (i) await sleep(1100); // Nominatim: máximo una consulta por segundo
+            try {
+                const point = await attempts[i]();
+                if (point) return point;
+            } catch (error) {
+                console.warn('Búsqueda de dirección fallida:', error);
+            }
+        }
+        return null;
+    }
+
+    // ---------- Ruta y tiempo estimado (OSRM, o línea recta) ----------
+
+    // Una ruta por pedido (geometría para dibujarla en el mapa del cliente), espaciadas 1 s entre sí
     async function computeEtas(from, stops) {
         const result = new Map();
         const located = stops.filter(o => isPoint(o.destination));
-        if (!located.length) return result;
-        try {
-            const coords = [from, ...located.map(o => o.destination)].map(p => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join(';');
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 8000);
-            const response = await fetch(`${OSRM_URL}${coords}?sources=0&annotations=duration,distance`, { signal: controller.signal });
-            clearTimeout(timer);
-            const data = await response.json();
-            if (data.code !== 'Ok') throw new Error(data.code || 'OSRM');
-            located.forEach((order, i) => {
-                const seconds = data.durations?.[0]?.[i + 1];
-                const distance = data.distances?.[0]?.[i + 1];
-                if (Number.isFinite(seconds)) result.set(order.id, { seconds: Math.round(seconds), distance: Math.round(distance || 0), method: 'osrm' });
-            });
-        } catch (error) {
-            console.warn('OSRM no disponible; se estima en línea recta:', error);
-        }
-        // Lo que OSRM no haya resuelto, en línea recta
-        for (const order of located) {
-            if (!result.has(order.id)) {
+        for (let i = 0; i < located.length; i++) {
+            const order = located[i];
+            if (i) await sleep(1100);
+            try {
+                const coords = [from, order.destination].map(p => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join(';');
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), 8000);
+                const response = await fetch(`${OSRM_URL}${coords}?overview=simplified&geometries=polyline&alternatives=false&steps=false`, { signal: controller.signal });
+                clearTimeout(timer);
+                const data = await response.json();
+                const route = data.routes?.[0];
+                if (data.code !== 'Ok' || !route) throw new Error(data.code || 'OSRM');
+                result.set(order.id, { seconds: Math.round(route.duration), distance: Math.round(route.distance), method: 'osrm', route: route.geometry || null });
+            } catch (error) {
+                console.warn('OSRM no disponible; se estima en línea recta:', error);
                 result.set(order.id, {
                     seconds: straightLineEtaSeconds(from, order.destination),
                     distance: Math.round(distanceMeters(from, order.destination)),
-                    method: 'linea'
+                    method: 'linea',
+                    route: null
                 });
             }
         }
@@ -121,7 +185,7 @@ export function createDelivery({ db, root, onDeliver, toast }) {
             await Promise.allSettled(stops.map(order => updateDoc(doc(db, 'tracking', order.id), {
                 courier,
                 updatedAt: serverTimestamp(),
-                ...(etaUpdate?.has(order.id) ? { eta: etaUpdate.get(order.id), etaAt: serverTimestamp() } : {})
+                ...(etaUpdate?.has(order.id) ? (({ route, ...eta }) => ({ eta, route, etaAt: serverTimestamp() }))(etaUpdate.get(order.id)) : {})
             })));
             lastSent = { lat: courier.lat, lng: courier.lng, at: now };
         } catch (error) {
