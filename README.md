@@ -20,7 +20,8 @@ Plataforma web desarrollada para la gestión, procesamiento y control de pedidos
 
 | Archivo | Función |
 |---|---|
-| `index.html` + `script.js` | Carta y pedido (requiere sesión) |
+| `index.html` + `script.js` | Carta (pública, con fotos) y pedido (la cuenta se pide al reservar) |
+| `img/` | Fotos de la carta (`clasico`, `bocadillo` en WebP + JPG) y vista previa para redes (`og-pachoncito.jpg`, 1200×630) |
 | `acceso.html` + `acceso.js` | Acceso con Google, alta del cliente con vinculación de teléfono e invitación a instalar |
 | `cuenta.html` + `cuenta.js` | Mi cuenta: ñapas, historial de pedidos y código de invitación |
 | `seguimiento.html` + `seguimiento.js` | Seguimiento de un pedido en vivo: estado y, en reparto, mapa con el repartidor y tiempo de llegada |
@@ -94,6 +95,15 @@ el panel (**📱 Teléfonos vinculados**).
 * **Por valorar:** 1 ñapa por cada pedido entregado que el cliente valora (elige el pedido y el sabor). La reseña usa el id del pedido (`reviews/{idPedido}`) y solo se crea una vez; las reglas (`isReviewReward` + `reviewableOrder`) exigen pedido propio, entregado, con ese sabor, y exactamente +1 en el mismo lote.
 * Al hacer el pedido, el cliente elige cuántas de sus ñapas acumuladas canjea (de 0 al total, campo opcional `creditsToRedeem`). Las elegidas aparecen en el panel y se descuentan al entregarlo; las demás siguen en su saldo. Los pedidos antiguos sin ese campo canjean todo el saldo, como antes.
 * Los clientes anteriores a las cuentas de Google (identificados por teléfono) se fusionan automáticamente con su nueva cuenta al entregarles el primer pedido.
+
+## Carta pública y llegada desde Instagram
+
+* **La carta se ve sin cuenta** (también dentro del navegador de Instagram): fotos, precios, regalo de bienvenida y alérgenos. La cuenta de Google solo se pide al pulsar «Reservar».
+* **La cesta viaja en el enlace:** al reservar, el visitante va a `acceso.html?next=index.html?c=2&b=1&e=domicilio&h=10:00` y, al volver, la carta recupera cantidades, entrega y hora (la dirección queda guardada en el dispositivo). El enlace se limpia después.
+* **Desde Instagram/Facebook** (donde Google no deja iniciar sesión): botón «Abrir en Safari» (iOS 17+, `x-safari-https://…`) o «Abrir en Chrome» (Android, `intent://…`) con la misma dirección, cesta incluida; si no se abre, las instrucciones del menú ⋯ y «Volver a la carta».
+* **Invitaciones:** `index.html?ref=ABC-1234` se guarda aunque el visitante no tenga cuenta y aparece rellenado en el alta.
+* **Vista previa al compartir** (Instagram, WhatsApp…): etiquetas Open Graph en `index.html` con `img/og-pachoncito.jpg`.
+* Para cambiar las fotos: sustituye `img/clasico.*` / `img/bocadillo.*` (cuadradas, 480×480) y sube `CACHE_VERSION` en `sw.js`.
 
 ## Reparto en directo
 

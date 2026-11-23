@@ -39,6 +39,8 @@ if (REFERRAL_CODE.test(inviteFromLink)) storage.set('pachoncito_ref', inviteFrom
 const IN_APP_BROWSER = /Instagram|FBAN|FBAV|FB_IAB|FBIOS|Messenger|Line\/|TikTok|musical_ly|BytedanceWebview|Snapchat|; wv\)/i
     .test(navigator.userAgent);
 const IS_ANDROID = /Android/i.test(navigator.userAgent);
+// iPhone/iPad (los iPad recientes se presentan como Mac con pantalla táctil)
+const IS_IOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 
 let session = null;
 let profile = null;
@@ -78,6 +80,12 @@ function goNext() {
 // ---------- Navegador interno ----------
 
 function showInAppHelp() {
+    // iOS 17+: «x-safari-https://…» abre la misma página (con la cesta en el enlace) directamente en Safari
+    if (IS_IOS) {
+        $('openSafariLink').href = location.href.replace(/^https?:/, match => `x-safari-${match}`);
+        $('openSafariLink').hidden = false;
+    }
+    $('backToMenuLink').href = next;
     if (IS_ANDROID) {
         const target = `${location.host}${location.pathname}${location.search}`;
         $('openChromeLink').href = `intent://${target}#Intent;scheme=https;package=com.android.chrome;end`;

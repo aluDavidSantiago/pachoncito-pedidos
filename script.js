@@ -8,7 +8,7 @@ import {
 } from "./orders.js";
 import { mountInstallPrompt, registerServiceWorker } from "./pwa.js";
 import { playReward, playSuccess, playTap } from "./sound.js";
-import { requireCustomer } from "./session.js";
+import { getCustomer, loginUrl } from "./session.js";
 import { watchStore } from "./store.js";
 import { bump, closeDialog, initUI, mountTopNav, nudge } from "./ui.js";
 import { el, formatEUR, MAX_QTY, NAPA_EVERY_CENTS, PRICES_CENTS, PRODUCT_NAMES, showMessage, storage, validateMobile } from "./shared.js";
@@ -19,8 +19,14 @@ hydrateIcons();
 mountFaq();
 initUI();
 
-// Auth wall: sin sesión o sin alta completa se redirige a acceso.html y se vuelve aquí después
-const { session, profile } = await requireCustomer();
+// Carta pública: cualquiera la ve (también desde el navegador de Instagram), con fotos, precios y regalo.
+// La cuenta solo se pide al pulsar «Reservar»: la cesta viaja en el enlace (?c=…&b=…) y se recupera al volver.
+const customer = await getCustomer();
+const guest = !customer;
+const session = customer?.session ?? null;
+const profile = customer?.profile ?? {};
+document.documentElement.classList.toggle('is-guest', guest);
+document.documentElement.classList.remove('auth-pending');
 
 const $ = id => document.getElementById(id);
 const form = $('orderForm');
@@ -39,12 +45,26 @@ let phoneBlocked = false;  // cuenta antigua con un teléfono que ya no es váli
 // aquí solo se muestra cuando el cliente cumple las mismas condiciones.
 const welcome = {
     active: false,       // settings/store.welcomeGift
-    lockIds: welcomeLockIds(session.uid, profile.phone, session.isTest),
+    lockIds: guest ? [] : welcomeLockIds(session.uid, profile.phone, session.isTest),
     missing: null,       // cerrojos welcomeGifts que aún no existen (null = sin consultar o reglas antiguas)
     hasOrders: true      // ya tiene algún pedido web (hasta comprobarlo, se asume que sí)
 };
 
-mountTopNav(profile);
+if (guest) {
+    // Visitante: la barra ofrece «Entrar» en lugar de su nombre y sus ñapas
+    mountTopNav({ name: 'Entrar', napaCredits: 0 });
+    const account = document.querySelector('.nav-account');
+    account.href = loginUrl('index.html');
+    account.setAttribute('aria-label', 'Entrar con tu cuenta');
+    account.querySelector('.nav-napas')?.setAttribute('hidden', '');
+    document.querySelectorAll('[data-member-only]').forEach(node => { node.hidden = true; });
+    $('guestNote').hidden = false;
+    // Enlace de invitación (index.html?ref=ANA-7K3P): se guarda para el alta, igual que en acceso.html
+    const ref = (new URLSearchParams(location.search).get('ref') || '').toUpperCase();
+    if (/^[A-Z]{3}-[A-Z2-9]{4}$/.test(ref)) storage.set('pachoncito_ref', ref);
+} else {
+    mountTopNav(profile);
+}
 mountInstallPrompt($('installSlot'));
 
 // Precios visibles desde la misma fuente que usa el cálculo
@@ -60,6 +80,7 @@ for (let minutes = 6 * 60; minutes <= 17 * 60 + 30; minutes += 30) {
 
 // Pedidos web del cliente, o null si no se pudieron consultar
 async function loadMyOrders() {
+    if (guest) return [];
     try {
         const snap = await getDocs(query(collection(db, 'orders'), where('uid', '==', session.uid)));
         return snap.docs.map(normalizeOrder);
@@ -82,6 +103,7 @@ function availableNapas(myOrders) {
 // Mismas condiciones que validWelcomeGift(): regalo activo, ningún pedido entregado (sin el campo cuenta como 0),
 // ningún pedido web anterior y ninguno de sus cerrojos creado todavía
 function welcomeEligible(missing = welcome.missing) {
+    if (guest) return welcome.active; // visitante: se anuncia; la cuenta y las reglas deciden al reservar
     return welcome.active
         && !(profile.completedOrders > 0)
         && !welcome.hasOrders
@@ -93,14 +115,18 @@ function renderWelcomeGift() {
     const show = welcomeEligible();
     const hasItems = quantities.clasico + quantities.bocadillo > 0;
     $('welcomeGift').hidden = !show;
-    $('welcomeGift').classList.toggle('is-included', show && hasItems);
-    $('welcomeGiftHint').textContent = hasItems
+    $('welcomeGift').classList.toggle('is-included', show && hasItems && !guest);
+    $('welcomeGiftHint').textContent = hasItems && !guest
         ? `1 × Pandebono ${PRODUCT_NAMES[WELCOME_GIFT_PRODUCT]} · va en este pedido`
         : `Tu primer pedido en la web lleva 1 pandebono ${PRODUCT_NAMES[WELCOME_GIFT_PRODUCT].toLowerCase()} gratis`;
-    $('summaryGift').hidden = !(show && hasItems);
+    $('summaryGift').hidden = !(show && hasItems && !guest);
 }
 
 async function refreshWelcome() {
+    if (guest) {
+        renderWelcomeGift();
+        return [];
+    }
     const [missing, myOrders] = await Promise.all([missingWelcomeLocks(db, welcome.lockIds), loadMyOrders()]);
     welcome.missing = missing;
     welcome.hasOrders = myOrders === null || myOrders.length > 0;
@@ -189,7 +215,7 @@ $('tipoEntrega').addEventListener('change', toggleDireccion);
 function prefill() {
     const savedUser = storage.get('pachoncito_user') || {};
     $('nombre').value = profile.name || savedUser.name || '';
-    $('telefono').value = profile.phone;
+    $('telefono').value = profile.phone || '';
     $('direccion').value = savedUser.address || profile.address || '';
 }
 
@@ -243,6 +269,17 @@ form.addEventListener('submit', async event => {
     const direccion = $('direccion').value.trim();
     const hora = $('hora').value;
     const order = computeOrder();
+
+    // Visitante: se guarda la cesta en el enlace y se pide entrar; al volver, la cesta le está esperando
+    if (guest) {
+        if (!storeOpen) return fail('El obrador descansa ahora mismo: no hay reservas activas. ¡Volvemos pronto!');
+        if (quantities.clasico + quantities.bocadillo === 0) return fail('Selecciona al menos un pandebono para tu pedido.');
+        const cart = new URLSearchParams({ c: quantities.clasico, b: quantities.bocadillo, e: order.deliveryMethod });
+        if (hora) cart.set('h', hora);
+        if (direccion) storage.set('pachoncito_user', { ...(storage.get('pachoncito_user') || {}), address: direccion });
+        location.href = loginUrl(`index.html?${cart}`);
+        return;
+    }
 
     if (nombre.length < 2) return fail('Escribe tu nombre y apellidos.', $('nombre'));
     if (!storeOpen) return fail('El obrador descansa ahora mismo: no hay reservas activas. ¡Volvemos pronto!');
@@ -316,12 +353,32 @@ form.addEventListener('submit', async event => {
     }
 });
 
+// Cesta guardada en el enlace (?c=2&b=1&e=domicilio&h=10:00): al volver de entrar, o desde «Abrir en Safari»
+function restoreCart() {
+    const params = new URLSearchParams(location.search);
+    if (!params.has('c') && !params.has('b')) return false;
+    setQty('clasico', parseInt(params.get('c'), 10) || 0);
+    setQty('bocadillo', parseInt(params.get('b'), 10) || 0);
+    if (['recogida', 'domicilio'].includes(params.get('e'))) $('tipoEntrega').value = params.get('e');
+    const slot = params.get('h');
+    if (slot && [...$('hora').options].some(option => option.value === slot)) $('hora').value = slot;
+    ['c', 'b', 'e', 'h'].forEach(key => params.delete(key));
+    const rest = params.toString();
+    history.replaceState(null, '', `${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`);
+    return quantities.clasico + quantities.bocadillo > 0;
+}
+
 prefill();
+const cartRestored = restoreCart();
 toggleDireccion();
+if (cartRestored && !guest) {
+    showMessage(message, 'Tu cesta te estaba esperando. Revisa la hora de entrega y reserva.', 'success');
+    requestAnimationFrame(() => $('submitBtn').scrollIntoView({ behavior: 'smooth', block: 'center' }));
+}
 
 // Cuentas anteriores a la validación estricta: si su teléfono no es un móvil español real, no se puede reservar
 // (las reglas también lo rechazan). Se avisa antes de que rellene el pedido.
-if (!session.isTest && !validateMobile(profile.phone).phone) {
+if (!guest && !session.isTest && !validateMobile(profile.phone).phone) {
     phoneBlocked = true;
     syncSubmit();
     showMessage(message, 'El teléfono vinculado a tu cuenta no es un móvil español válido. Escríbenos por Instagram para corregirlo y poder reservar.', 'error');

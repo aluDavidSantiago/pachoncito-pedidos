@@ -15,7 +15,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Pachoncito">
     <title>Pachoncito | Entrar</title>
-    <link rel="stylesheet" href="style.css?v=2.5.1">
+    <link rel="stylesheet" href="style.css?v=2.6.0">
 </head>
 <body>
     <div class="container">
@@ -41,17 +41,20 @@
 
             <!-- Navegador interno de Instagram/Facebook: Google bloquea ahí su inicio de sesión -->
             <section class="form-section" id="stepInApp" hidden>
-                <h2>Ábrelo en tu navegador</h2>
+                <h2>Un último paso para reservar</h2>
                 <p class="section-desc">
-                    Estás dentro de Instagram o Facebook, y Google no permite iniciar sesión desde aquí.
-                    Abre esta página en Chrome o Safari para continuar.
+                    Instagram no deja entrar con Google desde su navegador. Ábrelo en tu navegador con un toque:
+                    tu cesta va contigo.
                 </p>
+                <a id="openSafariLink" class="btn btn-primary" hidden><span data-icon="external"></span>Abrir en Safari</a>
+                <a id="openChromeLink" class="btn btn-primary" hidden><span data-icon="external"></span>Abrir en Chrome</a>
+                <p class="hint">¿No se abre? Hazlo a mano:</p>
                 <ol class="info-list">
                     <li>Pulsa el menú <strong>⋯</strong> (arriba a la derecha).</li>
                     <li>Elige <strong>«Abrir en el navegador»</strong> o <strong>«Abrir en navegador externo»</strong>.</li>
                 </ol>
-                <a id="openChromeLink" class="btn btn-primary" hidden>Abrir en Chrome</a>
                 <button type="button" id="copyLinkBtn" class="btn btn-secondary">Copiar el enlace</button>
+                <a id="backToMenuLink" href="index.html" class="btn btn-link">Volver a la carta</a>
                 <button type="button" id="tryAnywayBtn" class="btn btn-link">Intentarlo aquí de todos modos</button>
             </section>
 
@@ -143,6 +146,6 @@
         </dialog>
     </div>
 
-    <script type="module" src="acceso.js?v=2.5.1"></script>
+    <script type="module" src="acceso.js?v=2.6.0"></script>
 </body>
 </html>

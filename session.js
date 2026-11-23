@@ -46,6 +46,19 @@ export function loginUrl(next = currentRoute()) {
     return `acceso.html?next=${encodeURIComponent(safeNext(next))}`;
 }
 
+// Cliente con sesión y alta completa, o null (visitante). No redirige: para páginas públicas como la carta.
+export async function getCustomer() {
+    const session = await getSession();
+    if (!session) return null;
+    let profile = null;
+    try {
+        profile = await getProfile(session.uid);
+    } catch (error) {
+        console.error('No se pudo leer el expediente del cliente:', error);
+    }
+    return hasCompletedProfile(profile) ? { session, profile } : null;
+}
+
 // Devuelve { session, profile } o redirige a acceso.html y vuelve aquí tras autenticarse.
 // También exige el alta completa (expediente con nombre y teléfono) antes de entrar.
 export async function requireCustomer() {
