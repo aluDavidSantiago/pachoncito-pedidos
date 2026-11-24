@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Pachoncito">
     <title>Pachoncito | Pedidos</title>
-    <link rel="stylesheet" href="style.css?v=2.6.1">
+    <link rel="stylesheet" href="style.css?v=2.6.2">
 </head>
 <body>
     <div class="container">
@@ -66,7 +66,10 @@
             </div>
         </section>
 
-        <form id="orderForm" novalidate>
+        <!-- En horizontal la carta va a dos columnas: pandebonos a la izquierda (order-main) y datos, entrega y total
+             a la derecha (order-side-*). En vertical estos contenedores no existen (display: contents): todo igual que siempre. -->
+        <form id="orderForm" class="order-layout" novalidate>
+            <div class="order-side-top">
             <div class="field" data-member-only>
                 <label for="nombre">Nombre y Apellidos</label>
                 <input type="text" id="nombre" required maxlength="80" autocomplete="name" placeholder="Tu nombre completo">
@@ -76,15 +79,17 @@
                 <label for="telefono">Teléfono / WhatsApp <span class="optional">(vinculado a tu cuenta)</span></label>
                 <input type="tel" id="telefono" readonly aria-readonly="true">
             </div>
+            </div>
 
+            <div class="order-main">
             <p class="bakery-note"><span data-icon="flame"></span>Masa artesanal, horneada el mismo domingo de la entrega</p>
 
             <div class="products-section" id="pedido">
                 <div class="product-card" data-card="clasico">
                     <div class="product-main">
                         <picture class="product-photo">
-                            <source srcset="img/clasico.webp?v=2.6.1" type="image/webp">
-                            <img src="img/clasico.jpg?v=2.6.1" alt="Dos pandebonos clásicos recién horneados" width="480" height="480" loading="eager" decoding="async">
+                            <source srcset="img/clasico.webp?v=2.6.2" type="image/webp">
+                            <img src="img/clasico.jpg?v=2.6.2" alt="Dos pandebonos clásicos recién horneados" width="480" height="480" loading="eager" decoding="async">
                         </picture>
                         <div class="product-info">
                             <h3>Clásico</h3>
@@ -103,8 +108,8 @@
                 <div class="product-card" data-card="bocadillo">
                     <div class="product-main">
                         <picture class="product-photo">
-                            <source srcset="img/bocadillo.webp?v=2.6.1" type="image/webp">
-                            <img src="img/bocadillo.jpg?v=2.6.1" alt="Dos pandebonos abiertos con su relleno de bocadillo de guayaba" width="480" height="480" loading="eager" decoding="async">
+                            <source srcset="img/bocadillo.webp?v=2.6.2" type="image/webp">
+                            <img src="img/bocadillo.jpg?v=2.6.2" alt="Dos pandebonos abiertos con su relleno de bocadillo de guayaba" width="480" height="480" loading="eager" decoding="async">
                         </picture>
                         <div class="product-info">
                             <h3>Con Bocadillo</h3>
@@ -156,7 +161,9 @@
                     </p>
                 </div>
             </details>
+            </div>
 
+            <div class="order-side-bottom">
             <!-- Regalo de bienvenida: 1 clásico gratis en el primer pedido web (script.js · validWelcomeGift en firestore.rules) -->
             <div class="welcome-gift" id="welcomeGift" aria-live="polite" hidden>
                 <span data-icon="gift" class="welcome-gift-icon"></span>
@@ -219,6 +226,7 @@
                 <p class="payment-note"><span data-icon="cash"></span>Pago en efectivo o Bizum al recoger o recibir el pedido</p>
                 <button type="submit" class="btn btn-primary" id="submitBtn">Reservar para el domingo</button>
             </div>
+            </div>
         </form>
 
         <footer class="site-footer">
@@ -244,6 +252,6 @@
         <button type="button" class="btn btn-link" id="orderDoneClose">Hacer otro pedido</button>
     </dialog>
 
-    <script type="module" src="script.js?v=2.6.1"></script>
+    <script type="module" src="script.js?v=2.6.2"></script>
 </body>
 </html>

@@ -3838,3 +3838,138 @@ body.has-env-banner .top-nav {
 /* Acceso desde Instagram: el «hazlo a mano» va pegado a sus pasos */
 #stepInApp .hint { margin-bottom: 0; }
 #stepInApp .hint + .info-list { margin-top: 0; }
+
+/* =====================================================================
+   HORIZONTAL (móvil girado y tablet)
+   En vertical nada de esto aplica: los contenedores de columna son «display: contents».
+   ===================================================================== */
+
+.order-main,
+.order-side-top,
+.order-side-bottom { display: contents; }
+
+/* ---------- Dos columnas: carta y seguimiento con mapa ---------- */
+@media (orientation: landscape) and (min-width: 700px) {
+    .container:has(.order-layout),
+    .container:has(#trackLive:not([hidden])) { width: min(100%, 68rem); }
+
+    .order-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+        grid-template-areas: "main top" "main bottom";
+        grid-template-rows: auto 1fr;
+        column-gap: clamp(1.25rem, 3vw, 2.5rem);
+        align-items: start;
+    }
+
+    .order-main { display: block; grid-area: main; }
+    .order-side-top { display: block; grid-area: top; }
+    .order-side-bottom { display: block; grid-area: bottom; align-self: stretch; }
+
+    /* El total va dentro de su columna (en vertical ocupa todo el ancho de la tarjeta) */
+    .order-layout .summary {
+        margin: 0.75rem 0 0;
+        padding: 0.875rem 1rem calc(0.875rem + env(safe-area-inset-bottom));
+        border: 1px solid var(--hairline);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-sm);
+    }
+
+    /* Columna estrecha: tarjeta de producto en dos filas (foto · nombre arriba, contador abajo) */
+    .order-layout .product-card {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        column-gap: 0.875rem;
+        row-gap: 0.5rem;
+        align-items: center;
+    }
+    .order-layout .product-main { display: contents; }
+    .order-layout .product-photo { grid-row: span 2; width: clamp(5.5rem, 11vw, 7.5rem); }
+    .order-layout .product-card .counter { justify-self: end; }
+
+    /* Seguimiento: estado y resumen a la izquierda, mapa a la derecha (solo mientras está en reparto) */
+    #trackView:has(#trackLive:not([hidden])) {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+        column-gap: clamp(1.25rem, 3vw, 2.5rem);
+        align-items: start;
+    }
+    #trackView:has(#trackLive:not([hidden])) > .page-section { grid-column: 1; }
+    #trackView:has(#trackLive:not([hidden])) > #trackLive {
+        grid-column: 2;
+        grid-row: 1 / span 3;
+        position: sticky;
+        top: 5rem;
+        margin-top: 0;
+        padding-top: 0;
+        border-top: none;
+    }
+    #trackView:has(#trackLive:not([hidden])) > #trackLive .track-map { height: clamp(320px, 62vh, 560px); }
+}
+
+/* ---------- Móvil en horizontal: pantalla baja, se aprovecha cada píxel de alto ---------- */
+@media (orientation: landscape) and (max-height: 540px) {
+    body { padding: 0; }
+
+    .container,
+    .container:has(.order-layout),
+    .container:has(#trackLive:not([hidden])) {
+        width: 100%;
+        min-height: 100dvh;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        /* Respeta la muesca del iPhone, que en horizontal queda a un lado */
+        padding: 0.5rem max(var(--gutter), env(safe-area-inset-right)) calc(0.75rem + env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
+    }
+
+    .container::before { display: none; }
+
+    /* La barra superior deja de ser fija: libera alto para el contenido */
+    .top-nav {
+        position: static;
+        margin: 0 0 0.75rem;
+        padding: 0.25rem 0 0.5rem;
+        border-radius: 0;
+        background: none;
+    }
+
+    /* Cabecera en una línea: logo pequeño a la izquierda y lema a la derecha */
+    .site-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        text-align: left;
+        margin-bottom: 0.875rem;
+    }
+    .site-header .logo-container { margin: 0; }
+    .site-header .brand-picture,
+    .site-header .logo-container > a { width: 9.5rem; }
+    .site-header .badge { font-size: var(--fs-xs); white-space: nowrap; }
+
+    /* Resumen compacto: total y botón en una fila; la forma de pago está en la confirmación y en las FAQ */
+    .summary { row-gap: 0.25rem; padding-block: 0.5rem calc(0.5rem + env(safe-area-inset-bottom)); }
+    .summary .payment-note { display: none; }
+    .summary-total strong { font-size: 1.15rem; }
+    .summary .btn { min-height: 46px; }
+
+    .order-layout .summary { padding: 0.625rem 0.875rem; flex-wrap: nowrap; column-gap: 0.75rem; }
+    .order-layout .summary .btn { flex: 1 1 auto; min-width: 0; padding-inline: 0.75rem; font-size: var(--fs-sm); line-height: 1.2; }
+    .order-layout .product-photo { width: 5rem; }
+
+    /* Ventanas emergentes: caben en pantalla y se desplazan si hace falta */
+    .modal {
+        max-height: calc(100dvh - 1rem);
+        overflow-y: auto;
+        padding: 1rem 1.25rem;
+    }
+    .order-done-glyph { width: 2.5rem; height: 2.5rem; margin-bottom: 0.25rem; }
+    .order-done-summary { margin: 0.625rem 0 0.75rem; }
+    .order-done-hint { display: none; }
+
+    /* Seguimiento: mapa a la altura de la pantalla */
+    .track-map { height: max(240px, calc(100dvh - 7rem)); }
+    #trackView:has(#trackLive:not([hidden])) > #trackLive { top: 0.5rem; }
+    #trackView:has(#trackLive:not([hidden])) > #trackLive .track-map { height: max(240px, calc(100dvh - 7rem)); }
+}
