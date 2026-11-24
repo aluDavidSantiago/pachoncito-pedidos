@@ -3973,3 +3973,84 @@ body.has-env-banner .top-nav {
     #trackView:has(#trackLive:not([hidden])) > #trackLive { top: 0.5rem; }
     #trackView:has(#trackLive:not([hidden])) > #trackLive .track-map { height: max(240px, calc(100dvh - 7rem)); }
 }
+
+/* ---------- Horizontal · resto de páginas (alta, Mi cuenta, reseñas, seguimiento y panel) ---------- */
+@media (orientation: landscape) and (min-width: 700px) {
+    /* Más ancho para las páginas que pasan a dos columnas */
+    .container:has(#stepProfile:not([hidden])),
+    .container:has(#historial),
+    .container:has(#ratingForm),
+    .container:has(#trackView:not([hidden])) { width: min(100%, 62rem); }
+
+    /* Alta: nombre a todo el ancho; móvil y su repetición, dirección e invitación en parejas; botones lado a lado */
+    #stepProfile:not([hidden]) {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem 1.25rem;
+        align-items: start;
+    }
+    #stepProfile > h2,
+    #stepProfile > .section-desc,
+    #stepProfile > .field:first-of-type { grid-column: 1 / -1; }
+
+    /* Columnas de las páginas: separadores iguales en las dos para que sus títulos queden alineados */
+    .container:has(#historial) .page-centered,
+    .container:has(#ratingForm) .page-centered {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+        column-gap: clamp(1.5rem, 3.5vw, 3rem);
+        align-items: start;
+    }
+    .container:has(#historial) .page-centered > .page-section ~ .page-section,
+    .container:has(#ratingForm) .page-centered > .page-section ~ .page-section {
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+    }
+
+    /* Mi cuenta: saludo y saldo arriba; invitación y accesos a la izquierda; pedidos a la derecha */
+    .container:has(#historial) .page-centered > section[aria-labelledby="helloTitle"],
+    .container:has(#historial) #installSlot { grid-column: 1 / -1; }
+    .container:has(#historial) .page-centered > section[aria-labelledby="shareTitle"] { grid-column: 1; grid-row: 3; }
+    .container:has(#historial) #historial { grid-column: 2; grid-row: 3 / span 2; }
+    .container:has(#historial) .page-centered > .page-section:last-child { grid-column: 1; grid-row: 4; }
+
+    /* Reseñas: el formulario para valorar a la izquierda; la media y las últimas reseñas a la derecha */
+    .container:has(#ratingForm) .page-centered > section[aria-labelledby="rateTitle"] { grid-column: 1; grid-row: 1 / span 3; }
+    .container:has(#ratingForm) .page-centered > section[aria-labelledby="summaryTitle"] { grid-column: 2; grid-row: 1; margin-top: 0; padding-top: 0; border-top: none; }
+    .container:has(#ratingForm) .page-centered > section[aria-labelledby="listTitle"] { grid-column: 2; grid-row: 2; }
+    .container:has(#ratingForm) .page-centered > .page-section:last-child:not([aria-labelledby]) { grid-column: 2; grid-row: 3; }
+    .container:has(#ratingForm) .page-centered > section[aria-labelledby="rateTitle"] { margin-top: 0; padding-top: 0; border-top: none; }
+
+    /* Seguimiento sin mapa: estado a la izquierda y resumen a la derecha */
+    #trackView:has(#trackLive[hidden]) {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        column-gap: clamp(1.5rem, 3.5vw, 3rem);
+        align-items: start;
+    }
+    #trackView:has(#trackLive[hidden]) > .track-hero { grid-column: 1; }
+    #trackView:has(#trackLive[hidden]) > section[aria-labelledby="summaryTitle"] {
+        grid-column: 2;
+        grid-row: 1;
+        margin-top: 0;
+        padding-top: 0;
+        border-top: none;
+    }
+    #trackView:has(#trackLive[hidden]) > .page-section:last-child { grid-column: 1 / -1; }
+}
+
+/* Panel del obrador en el móvil girado: margen a los lados y fuera de la muesca */
+@media (orientation: landscape) and (max-height: 540px) {
+    body.admin-page {
+        padding: 0.5rem max(1rem, env(safe-area-inset-right)) calc(1rem + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+    }
+}
+
+/* Reseñas en horizontal: el formulario empieza a la misma altura que la columna derecha */
+@media (orientation: landscape) and (min-width: 700px) {
+    .container:has(#ratingForm) .page-centered > .page-section.form-section[aria-labelledby="rateTitle"] {
+        margin-top: 0;
+        padding-top: 0;
+        border-top: none;
+    }
+}
