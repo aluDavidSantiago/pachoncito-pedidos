@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Pachoncito">
     <title>Pachoncito | Pedidos</title>
-    <link rel="stylesheet" href="style.css?v=2.7.0">
+    <link rel="stylesheet" href="style.css?v=2.8.0">
 </head>
 <body>
     <div class="container">
@@ -88,8 +88,8 @@
                 <div class="product-card" data-card="clasico">
                     <div class="product-main">
                         <picture class="product-photo">
-                            <source srcset="img/clasico.webp?v=2.7.0" type="image/webp">
-                            <img src="img/clasico.jpg?v=2.7.0" alt="Dos pandebonos clásicos recién horneados" width="480" height="480" loading="eager" decoding="async">
+                            <source srcset="img/clasico.webp?v=2.8.0" type="image/webp">
+                            <img src="img/clasico.jpg?v=2.8.0" alt="Dos pandebonos clásicos recién horneados" width="480" height="480" loading="eager" decoding="async">
                         </picture>
                         <div class="product-info">
                             <h3>Clásico</h3>
@@ -108,8 +108,8 @@
                 <div class="product-card" data-card="bocadillo">
                     <div class="product-main">
                         <picture class="product-photo">
-                            <source srcset="img/bocadillo.webp?v=2.7.0" type="image/webp">
-                            <img src="img/bocadillo.jpg?v=2.7.0" alt="Dos pandebonos abiertos con su relleno de bocadillo de guayaba" width="480" height="480" loading="eager" decoding="async">
+                            <source srcset="img/bocadillo.webp?v=2.8.0" type="image/webp">
+                            <img src="img/bocadillo.jpg?v=2.8.0" alt="Dos pandebonos abiertos con su relleno de bocadillo de guayaba" width="480" height="480" loading="eager" decoding="async">
                         </picture>
                         <div class="product-info">
                             <h3>Con Bocadillo</h3>
@@ -223,10 +223,11 @@
 
             <div class="field">
                 <label for="hora">Hora de Entrega</label>
-                <!-- Las franjas de 30 minutos (06:00–17:30) se generan en script.js -->
-                <select id="hora" required>
+                <!-- Franjas de 30 minutos (06:00–17:30, oven.js): solo se pueden elegir las que tienen horno libre para el pedido -->
+                <select id="hora" required aria-describedby="horaHint">
                     <option value="" disabled selected>Selecciona una franja horaria</option>
                 </select>
+                <p class="hint" id="horaHint" aria-live="polite" hidden></p>
             </div>
 
             <p id="formMessage" class="form-message" role="status" aria-live="polite" hidden></p>
@@ -266,6 +267,6 @@
         <button type="button" class="btn btn-link" id="orderDoneClose">Hacer otro pedido</button>
     </dialog>
 
-    <script type="module" src="script.js?v=2.7.0"></script>
+    <script type="module" src="script.js?v=2.8.0"></script>
 </body>
 </html>

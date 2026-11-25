@@ -30,6 +30,9 @@ Plataforma web desarrollada para la gestión, procesamiento y control de pedidos
 | `admin-firebase.js` | Instancia de Firebase **exclusiva del panel**: su sesión nunca se mezcla con la de los clientes |
 | `admin-delivery.js` | Reparto en directo: «Salgo a repartir», envío de la ubicación, tiempo de llegada (OSRM) y «Entregado» |
 | `address.js` | Dirección a domicilio: sugerencias de calles de Premià, piso/puerta aparte y alfiler para confirmar la puerta |
+| `oven.js` | Capacidad del horno por franja, horas disponibles y plan de hornadas |
+| `notify.js` | Aviso de pedido nuevo al iPhone/iPad del obrador (ntfy) |
+| `admin-nav.js` | Navegación del repartidor dentro del panel |
 | `geo.js` | Distancias y tiempo de llegada en línea recta (compartido por panel y seguimiento) |
 | `map-style.js` | Mapa del seguimiento con los colores de la web (OpenFreeMap recoloreado, claro y oscuro) y decodificador de rutas |
 | `admin-cost-monitor.js` | Monitor de costes (solo lógica; los datos están en Firestore, solo para el obrador): proveedores, precio actual frente al anterior, margen por pandebono y lista de la compra |
@@ -97,6 +100,18 @@ el panel (**📱 Teléfonos vinculados**).
 * Al hacer el pedido, el cliente elige cuántas de sus ñapas acumuladas canjea (de 0 al total, campo opcional `creditsToRedeem`). Las elegidas aparecen en el panel y se descuentan al entregarlo; las demás siguen en su saldo. Los pedidos antiguos sin ese campo canjean todo el saldo, como antes.
 * Los clientes anteriores a las cuentas de Google (identificados por teléfono) se fusionan automáticamente con su nueva cuenta al entregarles el primer pedido.
 
+## Horno por horas
+
+* **Capacidad:** el horno saca `bandejas por hora × pandebonos por bandeja` (por defecto 2 × 16 = 32/h, 16 por franja de 30 min). Un pedido puede hornearse en su franja o antes, como mucho `horas de antelación` (por defecto 2 h). Se ajusta en el panel (**Horno por horas → Ajustes del horno**, guardado en `settings/store`).
+* **En la carta** solo se pueden elegir las horas en las que el pedido cabe contando todos los demás (`oven.js` · `fits`); las demás salen «completo». Cuentan los pandebonos pedidos, las ñapas, el regalo y las ñapas canjeadas. Si el pedido no cabe en ninguna hora, se pide escribir por Instagram.
+* **Carga pública** `ovenLoad/{domingo}` (solo números por franja): cada pedido suma exactamente lo suyo en el mismo lote (`firestore.rules` · `validOvenIncrement`) y el panel la recalcula con los pedidos reales (cancelados, borrados…).
+* **Plan de hornadas** en el panel: qué hornear en cada media hora, lo más tarde posible para que llegue recién hecho (`bakePlan`).
+
+## Avisos de pedidos nuevos (ntfy)
+
+* Cada pedido envía un aviso al canal `NOTIFY_TOPIC` de [ntfy](https://ntfy.sh) (`notify.js`), sin datos personales (cantidad, hora y tipo de entrega). En el iPhone/iPad: app **ntfy** → suscribirse a ese canal en el servidor `ntfy.sh`.
+* Con el panel abierto, además, aviso y sonido al instante.
+
 ## Carta pública y llegada desde Instagram
 
 * **La carta se ve sin cuenta** (también dentro del navegador de Instagram): fotos, precios, regalo de bienvenida y alérgenos. La cuenta de Google solo se pide al pulsar «Reservar».
@@ -115,7 +130,7 @@ el panel (**📱 Teléfonos vinculados**).
 * **Direcciones sin punto** (pedidos antiguos): se sitúan una sola vez al salir y se guardan en el pedido (`destination`). Se quita piso y puerta, se prueba la calle en castellano y en catalán («Calle Mayor» → «Carrer Mayor»), con y sin número, con [Nominatim](https://nominatim.org/) y, si no, con [Photon](https://photon.komoot.io/). Se descartan resultados a más de 15 km de Premià. Si no se encuentra, el cliente ve «Va de camino a tu casa» y la posición del repartidor, sin mensajes de error.
 * **Privacidad:** la ubicación solo vive en `tracking/{idPedido}` mientras el pedido está en reparto; se **borra** al marcar «Entregado» o «Terminar reparto» (los no entregados vuelven a «Listo»). Cada cliente solo puede leer el de su pedido (`firestore.rules`). Nominatim y OSRM solo los llama el móvil del repartidor, nunca los clientes.
 * **Cliente:** `seguimiento.html?pedido=…` (enlazado desde la confirmación y «Mi cuenta») muestra el estado y, en reparto, un mapa MapLibre + [OpenFreeMap](https://openfreemap.org/) (gratis, sin clave, uso comercial permitido) con los colores de la web, que se actualiza solo con `onSnapshot`: el repartidor se desliza, la ruta en dorado y el tiempo de llegada flotando encima. Solo aparecen la posición del repartidor y la dirección de entrega, nunca la ubicación del cliente.
-* **Importante:** con la pantalla apagada o en otra app, el navegador deja de dar la ubicación; al volver al panel se reanuda sola.
+* **Importante:** con la pantalla apagada o en otra app, el navegador deja de dar la ubicación; al volver al panel se reanuda sola. Por eso la **ruta se ve dentro del panel** (`admin-nav.js`): mapa que sigue al repartidor, ruta hasta la siguiente entrega e indicaciones en castellano de OSRM. En el iPad, Safari y Google Maps en Split View siguen enviando la ubicación.
 
 ## Regalo de bienvenida
 

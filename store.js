@@ -9,7 +9,8 @@ const storeRef = db => doc(db, 'settings', 'store');
 // onChange(open, { welcomeGift }): welcomeGift = regalo de bienvenida activo (solo si vale true).
 export function watchStore(db, onChange, onError) {
     return onSnapshot(storeRef(db), snap => onChange(snap.data()?.open !== false, {
-        welcomeGift: snap.data()?.welcomeGift === true
+        welcomeGift: snap.data()?.welcomeGift === true,
+        data: snap.data() || {}
     }), error => {
         console.error('Error al leer el estado del obrador:', error);
         onError?.(error);
@@ -18,6 +19,13 @@ export function watchStore(db, onChange, onError) {
 
 export function setStoreOpen(db, open) {
     return setDoc(storeRef(db), { open, updatedAt: serverTimestamp() }, { merge: true });
+}
+
+// Ajustes del horno (oven.js · ovenConfig): bandejas por hora, panes por bandeja y horas de antelación
+export function setOvenSettings(db, { traysPerHour, unitsPerTray, freshHours }) {
+    return setDoc(storeRef(db), {
+        ovenTraysPerHour: traysPerHour, ovenUnitsPerTray: unitsPerTray, ovenFreshHours: freshHours, updatedAt: serverTimestamp()
+    }, { merge: true });
 }
 
 // Activa o pausa el regalo de bienvenida (el panel lo activa tras preparar los cerrojos de quienes ya habían pedido)

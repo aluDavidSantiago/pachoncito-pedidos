@@ -108,10 +108,16 @@ export async function missingWelcomeLocks(db, ids) {
 }
 
 // Guarda el pedido y, en el mismo lote, los cerrojos que falten (las reglas exigen ambos a la vez si lleva regalo)
-export async function placeOrder(db, order, missingLocks = []) {
+// oven = { day, before }: suma el pedido a la carga del horno de ese domingo (ovenLoad/{day}) en el mismo lote.
+// `before` debe ser la carga actual: si otro pedido la cambió entre medias, las reglas lo rechazan y se reintenta.
+export async function placeOrder(db, order, missingLocks = [], oven = null) {
     const ref = doc(collection(db, 'orders'));
     const batch = writeBatch(db);
     batch.set(ref, order);
+    if (oven) {
+        const units = { ...oven.before, [order.deliverySlot]: (oven.before[order.deliverySlot] || 0) + oven.units };
+        batch.set(doc(db, 'ovenLoad', oven.day), { units, lastOrder: ref.id, updatedAt: serverTimestamp() });
+    }
     for (const id of missingLocks) {
         batch.set(doc(db, 'welcomeGifts', id), {
             uid: order.uid,

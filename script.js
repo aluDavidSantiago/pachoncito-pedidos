@@ -1,4 +1,4 @@
-import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, getDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { composeAddress, mountAddressPicker, splitAddress } from "./address.js";
 import { mountEnvBanner } from "./env.js";
 import { mountFaq } from "./faq.js";
@@ -7,6 +7,8 @@ import { hydrateIcons } from "./icons.js";
 import {
     buildOrder, missingWelcomeLocks, normalizeOrder, placeOrder, priceOrder, WELCOME_GIFT_LABEL, WELCOME_GIFT_PRODUCT, welcomeLockIds
 } from "./orders.js";
+import { notifyNewOrder } from "./notify.js";
+import { addUnits, fits, maxPerOrder, orderUnits, ovenConfig, ovenLoadRef, SLOTS, slotsFor, sundayKeyFor, watchOvenLoad } from "./oven.js";
 import { mountInstallPrompt, registerServiceWorker } from "./pwa.js";
 import { playReward, playSuccess, playTap } from "./sound.js";
 import { getCustomer, loginUrl } from "./session.js";
@@ -73,10 +75,46 @@ document.querySelectorAll('[data-price]').forEach(node => {
     node.textContent = formatEUR(PRICES_CENTS[node.dataset.price]);
 });
 
-// Franjas de 30 minutos entre 06:00 y 17:30
-for (let minutes = 6 * 60; minutes <= 17 * 60 + 30; minutes += 30) {
-    const slot = `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${minutes % 60 === 0 ? '00' : '30'}`;
-    $('hora').append(new Option(slot, slot));
+// Franjas de 30 minutos entre 06:00 y 17:30, limitadas por la capacidad del horno (oven.js)
+SLOTS.forEach(slot => $('hora').append(new Option(slot, slot)));
+let ovenCfg = ovenConfig();
+let ovenLoad = {};
+const ovenDay = sundayKeyFor();
+
+// Pandebonos que hay que hornear para la cesta actual (pedidos + ñapas + regalo + ñapas canjeadas)
+function cartUnits() {
+    const { napaCount } = computeOrder();
+    const hasItems = quantities.clasico + quantities.bocadillo > 0;
+    return orderUnits({ items: quantities, napaCount, welcomeGift: hasItems && !guest && welcomeEligible(), creditsToRedeem: napasToRedeem });
+}
+
+// Marca como «completo» las horas en las que este pedido no cabe en el horno, contando los demás pedidos
+function renderSlots() {
+    const units = cartUnits();
+    const options = slotsFor(ovenLoad, units, ovenCfg);
+    let blocked = 0;
+    options.forEach(({ slot, fits: ok }, i) => {
+        const option = $('hora').options[i + 1];
+        option.disabled = !ok;
+        option.textContent = ok ? slot : `${slot} · completo`;
+        if (!ok) blocked++;
+    });
+    const selected = $('hora').value;
+    const lost = selected && !options.find(o => o.slot === selected)?.fits;
+    if (lost) $('hora').value = '';
+    const hint = $('horaHint');
+    if (units > maxPerOrder(ovenCfg)) {
+        hint.textContent = `Un pedido de ${units} pandebonos no nos cabe en el horno para una sola hora. Escríbenos por Instagram y lo organizamos.`;
+    } else if (lost) {
+        hint.textContent = `Las ${selected} ya no tienen horno libre para ${units} pandebonos: elige otra hora.`;
+    } else if (blocked) {
+        hint.textContent = units > ovenCfg.perSlot
+            ? 'Tu pedido necesita más horno: las primeras horas y las que ya están llenas aparecen como «completo».'
+            : 'Las horas marcadas como «completo» ya no tienen horno libre.';
+    } else {
+        hint.textContent = '';
+    }
+    hint.hidden = !hint.textContent;
 }
 
 // Pedidos web del cliente, o null si no se pudieron consultar
@@ -141,6 +179,7 @@ function renderNapaRedeem() {
     const kept = napasAvailable - napasToRedeem;
     $('napaRedeemHint').textContent = `Tienes ${napasAvailable} ${napasAvailable === 1 ? 'disponible' : 'disponibles'}`
         + (kept > 0 ? ` · te guardamos ${kept} para otro pedido` : '');
+    renderSlots();
 }
 
 $('napaRedeem').addEventListener('click', event => {
@@ -164,6 +203,7 @@ function updateSummary() {
     $('totalPrice').textContent = total;
 
     renderWelcomeGift();
+    renderSlots();
 
     // Suena solo al ganar una ñapa más, no al perderla ni al repintar
     if (napaCount > lastNapaCount) playReward();
@@ -251,9 +291,11 @@ function syncSubmit() {
 }
 
 // Obrador en descanso: la carta se puede ver, pero contadores y reserva quedan desactivados
-function renderStore(open, { welcomeGift = false } = {}) {
+function renderStore(open, { welcomeGift = false, data = {} } = {}) {
     storeOpen = open;
     welcome.active = welcomeGift;
+    ovenCfg = ovenConfig(data);
+    renderSlots();
     renderWelcomeGift();
     $('closedBanner').hidden = open;
     form.classList.toggle('is-closed', !open);
@@ -338,15 +380,44 @@ form.addEventListener('submit', async event => {
             creditsToRedeem: napasToRedeem,
             welcomeGift: gift
         });
-        let ref;
-        try {
-            ref = await placeOrder(db, orderData, missing || []);
-        } catch (error) {
-            // Un pedido sin regalo nunca debe fallar por los cerrojos: se guarda como en la versión anterior
-            if (gift || !missing?.length || error?.code !== 'permission-denied') throw error;
-            console.warn('Pedido guardado sin cerrojo de bienvenida:', error);
-            ref = await placeOrder(db, orderData, []);
+        // Horno: la hora tiene que seguir cabiendo con la carga más reciente (otro cliente pudo reservar a la vez)
+        const units = orderUnits(orderData);
+        const freshLoad = async () => {
+            try { return (await getDoc(ovenLoadRef(db, ovenDay))).data()?.units || {}; } catch { return null; }
+        };
+        let latest = await freshLoad();
+        if (latest && !fits(addUnits(latest, hora, units), ovenCfg)) {
+            ovenLoad = latest;
+            renderSlots();
+            fail(`Justo ahora se ha llenado el horno a las ${hora}. Elige otra hora, por favor.`, $('hora'));
+            return;
         }
+        // Del intento más completo al más sencillo: con horno y cerrojos → horno recargado → sin horno (reglas
+        // antiguas) → sin cerrojos (solo si no lleva regalo). Así ningún pedido válido se queda sin guardar.
+        const attempts = [];
+        if (latest) attempts.push(() => placeOrder(db, orderData, missing || [], { day: ovenDay, before: latest, units }));
+        if (latest) attempts.push(async () => {
+            latest = await freshLoad();
+            if (!latest || !fits(addUnits(latest, hora, units), ovenCfg)) throw Object.assign(new Error('Horno lleno'), { code: 'oven-full' });
+            return placeOrder(db, orderData, missing || [], { day: ovenDay, before: latest, units });
+        });
+        attempts.push(() => placeOrder(db, orderData, missing || []));
+        if (!gift && missing?.length) attempts.push(() => placeOrder(db, orderData, []));
+        let ref;
+        for (let i = 0; i < attempts.length && !ref; i++) {
+            try {
+                ref = await attempts[i]();
+            } catch (error) {
+                if (error?.code === 'oven-full') {
+                    renderSlots();
+                    fail(`Justo ahora se ha llenado el horno a las ${hora}. Elige otra hora, por favor.`, $('hora'));
+                    return;
+                }
+                if (error?.code !== 'permission-denied' || i === attempts.length - 1) throw error;
+                console.warn('Reintentando el pedido de otra forma:', error);
+            }
+        }
+        notifyNewOrder(orderData, { test: session.isTest });
         welcome.missing = [];
         welcome.hasOrders = true;
         napasAvailable -= napasToRedeem;
@@ -383,6 +454,7 @@ form.addEventListener('submit', async event => {
 });
 
 // Cesta guardada en el enlace (?c=2&b=1&e=domicilio&h=10:00): al volver de entrar, o desde «Abrir en Safari»
+let repeated = false;
 function restoreCart() {
     const params = new URLSearchParams(location.search);
     if (!params.has('c') && !params.has('b')) return false;
@@ -391,7 +463,8 @@ function restoreCart() {
     if (['recogida', 'domicilio'].includes(params.get('e'))) $('tipoEntrega').value = params.get('e');
     const slot = params.get('h');
     if (slot && [...$('hora').options].some(option => option.value === slot)) $('hora').value = slot;
-    ['c', 'b', 'e', 'h'].forEach(key => params.delete(key));
+    repeated = params.get('r') === '1';
+    ['c', 'b', 'e', 'h', 'r'].forEach(key => params.delete(key));
     const rest = params.toString();
     history.replaceState(null, '', `${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`);
     return quantities.clasico + quantities.bocadillo > 0;
@@ -401,8 +474,10 @@ prefill();
 const cartRestored = restoreCart();
 toggleDireccion();
 if (cartRestored && !guest) {
-    showMessage(message, 'Tu cesta te estaba esperando. Revisa la hora de entrega y reserva.', 'success');
-    requestAnimationFrame(() => $('submitBtn').scrollIntoView({ behavior: 'smooth', block: 'center' }));
+    showMessage(message, repeated
+        ? 'Hemos puesto lo mismo que en tu pedido anterior. Elige la hora de entrega: solo aparecen las que tienen horno libre.'
+        : 'Tu cesta te estaba esperando. Revisa la hora de entrega y reserva.', 'success');
+    requestAnimationFrame(() => (repeated ? $('hora') : $('submitBtn')).scrollIntoView({ behavior: 'smooth', block: 'center' }));
 }
 
 // Cuentas anteriores a la validación estricta: si su teléfono no es un móvil español real, no se puede reservar
@@ -413,6 +488,7 @@ if (!guest && !session.isTest && !validateMobile(profile.phone).phone) {
     showMessage(message, 'El teléfono vinculado a tu cuenta no es un móvil español válido. Escríbenos por Instagram para corregirlo y poder reservar.', 'error');
 }
 watchStore(db, renderStore);
+watchOvenLoad(db, ovenDay, load => { ovenLoad = load; renderSlots(); });
 napasAvailable = availableNapas(await refreshWelcome());
 napasToRedeem = napasAvailable;
 renderNapaRedeem();

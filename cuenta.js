@@ -97,6 +97,13 @@ function orderItem(order) {
                 className: `btn ${order.status === 'delivering' ? 'btn-primary' : 'btn-secondary'} btn-small order-track-link`,
                 href: `seguimiento.html?pedido=${encodeURIComponent(order.id)}`
             }, order.status === 'delivering' ? 'Ver el reparto en el mapa' : 'Seguir mi pedido')
+            : null,
+        // Repetir: la misma cesta y forma de entrega; la hora se elige de nuevo (según el horno libre)
+        order.status !== 'rejected' && (order.items?.clasico || order.items?.bocadillo)
+            ? el('a', {
+                className: 'btn btn-secondary btn-small order-track-link',
+                href: `index.html?${new URLSearchParams({ c: order.items.clasico || 0, b: order.items.bocadillo || 0, e: order.deliveryMethod, r: 1 })}`
+            }, 'Repetir este pedido')
             : null
     );
 }

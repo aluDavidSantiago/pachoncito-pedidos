@@ -2,7 +2,7 @@
 // del obrador nunca se mezcla con la sesión de Google de un cliente en el mismo navegador.
 import {
     collection, deleteDoc, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query,
-    runTransaction, serverTimestamp, updateDoc, writeBatch
+    runTransaction, serverTimestamp, setDoc, updateDoc, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import {
@@ -19,7 +19,9 @@ import { mountEnvBanner, TEST_CUSTOMERS, TEST_PHONES_LABEL, USE_EMULATORS } from
 import { hydrateIcons, icon } from "./icons.js";
 import { completeOrder, normalizeOrder, WELCOME_GIFT_LABEL, welcomeLockIds } from "./orders.js";
 import { clearTestData, seedTestData } from "./seeder.js";
-import { setStoreOpen, setWelcomeGift, watchStore } from "./store.js";
+import { bakePlan, bakeStart, loadFromOrders, maxPerOrder, ovenConfig, ovenLoadRef, SLOTS, sundayKeyFor as ovenSunday } from "./oven.js";
+import { playSuccess } from "./sound.js";
+import { setOvenSettings, setStoreOpen, setWelcomeGift, watchStore } from "./store.js";
 import { el, formatDate, formatEUR, normalizePhone, PRODUCT_NAMES, RATING_ASPECTS, showMessage, starsText, withBusy } from "./shared.js";
 import { closeDialog, initUI, toast } from "./ui.js";
 
@@ -58,6 +60,7 @@ const filters = { sunday: currentSundayKey(), tab: 'pendientes', search: '' };
 const delivery = createDelivery({
     db,
     root: document.getElementById('deliveryPanel'),
+    navRoot: document.getElementById('deliveryNav'),
     onDeliver: (order, button) => changeStatus(order, 'completed', button),
     toast
 });
@@ -93,7 +96,9 @@ function applyBiometricLabels() {
     $('biometricLoginLabel').textContent = `Entrar con ${label}`;
     $('lockDesc').textContent = `Desbloquéalo con ${label} para ver los pedidos.`;
     $('biometricOfferTitle').textContent = `¿Activar ${label}?`;
-    $('biometricOfferText').textContent = `Accede más rápido al panel: tu sesión se quedará en este dispositivo y se desbloqueará con ${label}.`;
+    $('biometricOfferText').textContent = `Accede más rápido al panel: tu sesión se quedará en este dispositivo y se desbloqueará con ${label}.`
+        + (/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) && label === 'Face ID'
+            ? ' Si te ofrece guardarla en Google, pulsa «Otras opciones» y elige «Contraseñas» (llavero del iPhone).' : '');
     $('biometricLoginHint').textContent = `Tras entrar con tu contraseña en este dispositivo podrás desbloquear el panel con ${label}.`;
 }
 applyBiometricLabels();
@@ -269,8 +274,18 @@ function startListeners() {
 
     unsubscribers = [
         onSnapshot(query(collection(db, 'orders'), orderBy('createdAt', 'desc')), snap => {
+            const before = orders.length ? new Set(orders.map(o => o.id)) : null;
             orders = snap.docs.map(normalizeOrder);
+            // Pedido nuevo con el panel abierto: aviso y sonido (el aviso del móvil llega por ntfy, notify.js)
+            if (before) {
+                for (const order of orders.filter(o => !before.has(o.id) && !snap.metadata.hasPendingWrites)) {
+                    const units = (order.items?.clasico || 0) + (order.items?.bocadillo || 0);
+                    toast(`Nuevo pedido: ${order.customerName || 'cliente'} · ${units} ${units === 1 ? 'pandebono' : 'pandebonos'} · ${order.deliverySlot}`, 'success');
+                    playSuccess();
+                }
+            }
             renderAll();
+            syncOvenLoad();
         }, onError),
         onSnapshot(collection(db, 'customers'), snap => {
             customers = new Map(snap.docs.map(d => [d.id, d.data()]));
@@ -280,9 +295,16 @@ function startListeners() {
             reviews = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             renderReviews();
         }, onError),
-        watchStore(db, (open, { welcomeGift }) => {
+        watchStore(db, (open, { welcomeGift, data }) => {
             renderStoreStatus(open);
             renderWelcomeStatus(welcomeGift);
+            ovenCfg = ovenConfig(data);
+            renderOvenForm();
+            renderOven();
+        }, onError),
+        onSnapshot(ovenLoadRef(db, ovenSunday()), snap => {
+            storedLoad = snap.data()?.units || {};
+            syncOvenLoad();
         }, onError)
     ];
 
@@ -344,6 +366,7 @@ function stopListeners() {
 function renderAll() {
     renderSundayOptions();
     renderProduction();
+    renderOven();
     renderOrders();
     delivery.update(orders, ordersOfSunday());
 }
@@ -832,6 +855,79 @@ $('releasePhoneBtn').addEventListener('click', async event => {
         showMessage(releaseMessage, 'No se pudo liberar el teléfono.', 'error');
     }
 });
+
+// ---------- Horno por horas ----------
+
+let ovenCfg = ovenConfig();
+let storedLoad = null;
+
+// La carga que ve la carta (ovenLoad) se corrige con los pedidos reales: cancelados, borrados o de la web antigua
+async function syncOvenLoad() {
+    if (storedLoad === null || !orders.length && !Object.keys(storedLoad).length) return;
+    const day = ovenSunday();
+    const real = loadFromOrders(orders, orderSunday).get(day) || {};
+    const same = JSON.stringify(Object.entries(real).filter(([, v]) => v).sort()) === JSON.stringify(Object.entries(storedLoad).filter(([, v]) => v).sort());
+    if (same) return;
+    try {
+        await setDoc(ovenLoadRef(db, day), { units: real, lastOrder: 'panel', updatedAt: serverTimestamp() });
+    } catch (error) {
+        console.warn('No se pudo actualizar la carga del horno:', error);
+    }
+}
+
+function renderOvenForm() {
+    $('ovenTrays').value = ovenCfg.traysPerHour;
+    $('ovenUnits').value = ovenCfg.unitsPerTray;
+    $('ovenFresh').value = ovenCfg.freshHours;
+    $('ovenFormHint').textContent = `${ovenCfg.traysPerHour * ovenCfg.unitsPerTray} pandebonos por hora · un pedido puede tener como mucho ${maxPerOrder(ovenCfg)} para una misma hora.`;
+}
+
+$('ovenForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector('button');
+    const values = { traysPerHour: Number($('ovenTrays').value), unitsPerTray: Number($('ovenUnits').value), freshHours: Number($('ovenFresh').value) };
+    if (Object.values(values).some(v => !Number.isInteger(v) || v < 1)) {
+        toast('Escribe números enteros mayores que 0.', 'error');
+        return;
+    }
+    try {
+        await withBusy(button, 'Guardando…', () => setOvenSettings(db, values));
+        toast('Ajustes del horno guardados: la carta ya los usa.', 'success');
+    } catch (error) {
+        console.error('Error guardando el horno:', error);
+        toast('No se pudieron guardar los ajustes del horno.', 'error');
+    }
+});
+
+function renderOven() {
+    const panel = $('ovenPanel');
+    if (!panel) return;
+    const load = loadFromOrders(ordersOfSunday(), orderSunday);
+    const merged = {};
+    for (const day of load.values()) for (const [slot, units] of Object.entries(day)) merged[slot] = (merged[slot] || 0) + units;
+    const { plan, missing } = bakePlan(merged, ovenCfg);
+    const rows = plan.map((p, i) => ({ ...p, slot: SLOTS[i] })).filter(p => p.total > 0);
+    const status = $('ovenStatus');
+    if (!rows.length && !missing.length) {
+        panel.replaceChildren(el('p', { className: 'empty-state', text: 'Sin pedidos para hornear este domingo.' }));
+        status.textContent = `${ovenCfg.perSlot} por media hora`;
+        status.dataset.state = 'idle';
+        return;
+    }
+    status.textContent = missing.length ? 'No cabe todo' : 'Todo cabe';
+    status.dataset.state = missing.length ? 'paused' : 'live';
+    panel.replaceChildren(...[
+        missing.length ? el('p', { className: 'form-message', 'data-type': 'error',
+            text: `No da tiempo a hornear: ${missing.map(m => `${m.units} para las ${m.slot}`).join(', ')}. Sube los ajustes del horno o cambia la hora de algún pedido.` }) : null,
+        el('ol', { className: 'oven-plan' }, rows.map(r => el('li', { className: 'oven-row' },
+            el('span', { className: 'oven-time', text: `${bakeStart(r.slot)}–${r.slot}` }),
+            el('span', { className: 'oven-bar', role: 'img', 'aria-label': `${r.total} de ${ovenCfg.perSlot}` },
+                el('span', { className: 'oven-fill', style: `width:${Math.min(100, Math.round(r.total / ovenCfg.perSlot * 100))}%` })),
+            el('span', { className: 'oven-count', text: `${r.total}/${ovenCfg.perSlot}` }),
+            el('span', { className: 'oven-for', text: r.parts.map(p => `${p.units} para las ${p.slot}`).join(' · ') })))),
+        el('p', { className: 'hint', text: 'Cada fila es una hornada de media hora. Se hornea lo más tarde posible para que llegue recién hecho.' })
+    ].filter(Boolean));
+}
 
 // ---------- Regalo de bienvenida ----------
 // 1 clásico gratis en el primer pedido web. Antes de activarlo se crea el cerrojo welcomeGifts/{uid} (y el de su

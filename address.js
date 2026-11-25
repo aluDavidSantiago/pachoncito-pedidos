@@ -4,7 +4,7 @@
 // sin volver a buscar la dirección. Si no se confirma, el panel la busca como antes (admin-delivery.js).
 import { isPoint } from "./geo.js";
 import { icon } from "./icons.js";
-import { brandStyle, MAP_STYLE_URL, PREMIA_CENTER } from "./map-style.js";
+import { brandMapStyle, loadMapLibre, PREMIA_CENTER } from "./map-style.js";
 import { el } from "./shared.js";
 
 export const TOWN = 'Premià de Mar';
@@ -13,13 +13,6 @@ const PHOTON_URL = 'https://photon.komoot.io/api/';
 // Premià de Mar y un margen alrededor: también lo comprueban las reglas (isDeliveryPoint)
 export const ZONE = { minLat: 41.47, maxLat: 41.51, minLng: 2.33, maxLng: 2.39 };
 export const inZone = p => isPoint(p) && p.lat >= ZONE.minLat && p.lat <= ZONE.maxLat && p.lng >= ZONE.minLng && p.lng <= ZONE.maxLng;
-
-const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
-const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
-const MAPLIBRE_SRI = {
-    js: 'sha384-SYKAG6cglRMN0RVvhNeBY0r3FYKNOJtznwA0v7B5Vp9tr31xAHsZC0DqkQ/pZDmj',
-    css: 'sha384-MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V'
-};
 
 // «Calle Mayor 12» + «2º 1ª» → «Calle Mayor 12, 2º 1ª, 08330 Premià de Mar»
 export function composeAddress(street, extra) {
@@ -58,20 +51,6 @@ export async function suggest(query, signal) {
 
 // ---------- Mini mapa con alfiler ----------
 
-let maplibrePromise = null;
-function loadMapLibre() {
-    if (window.maplibregl) return Promise.resolve(window.maplibregl);
-    if (maplibrePromise) return maplibrePromise;
-    maplibrePromise = new Promise((resolve, reject) => {
-        const css = el('link', { rel: 'stylesheet', href: MAPLIBRE_CSS, integrity: MAPLIBRE_SRI.css, crossorigin: 'anonymous' });
-        const js = el('script', { src: MAPLIBRE_JS, integrity: MAPLIBRE_SRI.js, crossorigin: 'anonymous' });
-        js.onload = () => resolve(window.maplibregl);
-        js.onerror = () => reject(new Error('No se pudo cargar el mapa'));
-        document.head.append(css, js);
-    });
-    return maplibrePromise;
-}
-
 // Controla el bloque de dirección de la carta. onChange(point|null) cada vez que cambia el punto confirmado.
 export function mountAddressPicker({ input, list, mapBox, hint, onChange }) {
     let point = null;
@@ -99,13 +78,7 @@ export function mountAddressPicker({ input, list, mapBox, hint, onChange }) {
         try {
             const gl = await loadMapLibre();
             if (!map) {
-                let style;
-                try {
-                    const response = await fetch(MAP_STYLE_URL);
-                    style = brandStyle(await response.json(), matchMedia('(prefers-color-scheme: dark)').matches);
-                } catch {
-                    style = { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#efe7da' } }] };
-                }
+                const style = await brandMapStyle();
                 map = new gl.Map({ container: mapBox.querySelector('.address-map'), style, center: [point.lng, point.lat], zoom: 17,
                     attributionControl: { compact: true }, dragRotate: false, pitchWithRotate: false, touchPitch: false });
                 map.touchZoomRotate.disableRotation();
