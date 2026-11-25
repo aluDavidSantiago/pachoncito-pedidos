@@ -50,7 +50,8 @@ export function priceOrder(items, deliveryMethod) {
 // uid = cuenta del cliente; phone = su teléfono/WhatsApp vinculado (contacto para la entrega)
 // creditsToRedeem = ñapas acumuladas que el cliente elige canjear en este pedido (0…saldo); las demás se le guardan
 // welcomeGift = regalo de bienvenida (1 clásico gratis en su primer pedido web): no cambia items, precios ni ñapas
-export function buildOrder({ uid, name, phone, items, deliveryMethod, address, slot, test, creditsToRedeem, welcomeGift }) {
+// destination = punto exacto de entrega que el cliente confirmó en el mapa ({ lat, lng }, opcional)
+export function buildOrder({ uid, name, phone, items, deliveryMethod, address, destination, slot, test, creditsToRedeem, welcomeGift }) {
     return {
         uid,
         customerName: name,
@@ -59,6 +60,7 @@ export function buildOrder({ uid, name, phone, items, deliveryMethod, address, s
         ...priceOrder(items, deliveryMethod),
         deliveryMethod,
         address: deliveryMethod === 'domicilio' ? address : PICKUP_ADDRESS,
+        ...(deliveryMethod === 'domicilio' && destination ? { destination: { lat: destination.lat, lng: destination.lng } } : {}),
         deliverySlot: slot,
         ...(Number.isInteger(creditsToRedeem) ? { creditsToRedeem } : {}),
         ...(welcomeGift ? { welcomeGift: true } : {}),

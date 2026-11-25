@@ -16,6 +16,7 @@ rules_version = '2';
 //                            creditsToRedeem (opcional): ñapas acumuladas que elige canjear en ese pedido.
 //                            welcomeGift (opcional, true): regalo de bienvenida, 1 pandebono clásico gratis en su
 //                            primer pedido web. No cambia items, precios ni ñapas.
+//                            destination (opcional, a domicilio): { lat, lng } que el cliente confirma en el mapa.
 //   welcomeGifts/{uid}       Cerrojo del regalo de bienvenida: «esta cuenta ya tiene un pedido web». Se crea junto
 //   welcomeGifts/{teléfono}  a su primer pedido web (con o sin regalo) y no se edita ni se borra desde la web. El de
 //                            teléfono evita repetir regalo si un número liberado se vincula a otra cuenta (las
@@ -103,6 +104,16 @@ service cloud.firestore {
 
     function validName(name) {
       return name is string && name.size() >= 2 && name.size() <= 80;
+    }
+
+    // Punto de entrega que el cliente confirma en el mapa: dentro de Premià de Mar y alrededores (address.js · ZONE)
+    function isDeliveryPoint(p) {
+      return p is map
+        && p.keys().hasAll(['lat', 'lng'])
+        && p.keys().hasOnly(['lat', 'lng'])
+        && p.lat is number && p.lng is number
+        && p.lat >= 41.47 && p.lat <= 41.51
+        && p.lng >= 2.33 && p.lng <= 2.39;
     }
 
     function validAddress(address) {
@@ -257,7 +268,7 @@ service cloud.firestore {
                               'status', 'test', 'createdAt'])
         && d.keys().hasOnly(['uid', 'customerName', 'phone', 'items', 'subtotalCents', 'deliveryCents',
                              'totalCents', 'napaCount', 'deliveryMethod', 'address', 'deliverySlot',
-                             'status', 'test', 'createdAt', 'creditsToRedeem', 'welcomeGift'])
+                             'status', 'test', 'createdAt', 'creditsToRedeem', 'welcomeGift', 'destination'])
         && d.uid is string
         && validName(d.customerName)
         && isPhone(d.phone)
@@ -274,6 +285,7 @@ service cloud.firestore {
         && d.napaCount == math.floor(d.totalCents / 1000)
         && (!('creditsToRedeem' in d) || isQty(d.creditsToRedeem))
         && (!('welcomeGift' in d) || d.welcomeGift == true)
+        && (!('destination' in d) || (d.deliveryMethod == 'domicilio' && isDeliveryPoint(d.destination)))
         && d.address is string
         && (d.deliveryMethod == 'domicilio'
               ? (d.address.size() >= 5 && d.address.size() <= 200)

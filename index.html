@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Pachoncito">
     <title>Pachoncito | Pedidos</title>
-    <link rel="stylesheet" href="style.css?v=2.6.3">
+    <link rel="stylesheet" href="style.css?v=2.7.0">
 </head>
 <body>
     <div class="container">
@@ -88,8 +88,8 @@
                 <div class="product-card" data-card="clasico">
                     <div class="product-main">
                         <picture class="product-photo">
-                            <source srcset="img/clasico.webp?v=2.6.3" type="image/webp">
-                            <img src="img/clasico.jpg?v=2.6.3" alt="Dos pandebonos clásicos recién horneados" width="480" height="480" loading="eager" decoding="async">
+                            <source srcset="img/clasico.webp?v=2.7.0" type="image/webp">
+                            <img src="img/clasico.jpg?v=2.7.0" alt="Dos pandebonos clásicos recién horneados" width="480" height="480" loading="eager" decoding="async">
                         </picture>
                         <div class="product-info">
                             <h3>Clásico</h3>
@@ -108,8 +108,8 @@
                 <div class="product-card" data-card="bocadillo">
                     <div class="product-main">
                         <picture class="product-photo">
-                            <source srcset="img/bocadillo.webp?v=2.6.3" type="image/webp">
-                            <img src="img/bocadillo.jpg?v=2.6.3" alt="Dos pandebonos abiertos con su relleno de bocadillo de guayaba" width="480" height="480" loading="eager" decoding="async">
+                            <source srcset="img/bocadillo.webp?v=2.7.0" type="image/webp">
+                            <img src="img/bocadillo.jpg?v=2.7.0" alt="Dos pandebonos abiertos con su relleno de bocadillo de guayaba" width="480" height="480" loading="eager" decoding="async">
                         </picture>
                         <div class="product-info">
                             <h3>Con Bocadillo</h3>
@@ -202,9 +202,23 @@
                 </select>
             </div>
 
-            <div class="field field-reveal" id="direccionBox" hidden>
-                <label for="direccion">Dirección de Entrega</label>
-                <input type="text" id="direccion" maxlength="200" autocomplete="street-address" placeholder="Calle, número, piso...">
+            <!-- Dirección a domicilio (address.js): calle con sugerencias de Premià de Mar, piso/puerta aparte y un
+                 mini mapa con alfiler para confirmar la puerta exacta. El punto confirmado se guarda en el pedido. -->
+            <div class="field-reveal address-box" id="direccionBox" hidden>
+                <div class="field address-field">
+                    <label for="direccion">Calle y número <span class="optional">· Premià de Mar (08330)</span></label>
+                    <input type="text" id="direccion" maxlength="120" autocomplete="off" placeholder="Ej.: Carrer de Sant Pere 12"
+                        role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="direccionList">
+                    <ul class="address-list" id="direccionList" role="listbox" aria-label="Calles de Premià de Mar" hidden></ul>
+                </div>
+                <div class="field">
+                    <label for="direccionExtra">Piso, puerta… <span class="optional">(opcional)</span></label>
+                    <input type="text" id="direccionExtra" maxlength="60" autocomplete="address-line2" placeholder="2º 1ª · Casa · Bajos">
+                </div>
+                <div class="address-map-box" id="direccionMap" hidden>
+                    <div class="address-map" role="application" aria-label="Mapa para confirmar tu puerta"></div>
+                </div>
+                <p class="hint address-hint" id="direccionHint" aria-live="polite"></p>
             </div>
 
             <div class="field">
@@ -252,6 +266,6 @@
         <button type="button" class="btn btn-link" id="orderDoneClose">Hacer otro pedido</button>
     </dialog>
 
-    <script type="module" src="script.js?v=2.6.3"></script>
+    <script type="module" src="script.js?v=2.7.0"></script>
 </body>
 </html>
