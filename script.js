@@ -1,4 +1,5 @@
 import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { composeAddress, mountAddressPicker, splitAddress } from "./address.js";
 import { mountEnvBanner } from "./env.js";
 import { mountFaq } from "./faq.js";
 import { db } from "./firebase.js";
@@ -202,10 +203,30 @@ form.addEventListener('click', event => {
     updateSummary();
 });
 
+// Dirección a domicilio: sugerencias de calles de Premià y alfiler para confirmar la puerta (address.js)
+const addressPicker = mountAddressPicker({
+    input: $('direccion'),
+    list: $('direccionList'),
+    mapBox: $('direccionMap'),
+    hint: $('direccionHint')
+});
+
+function fullAddress() {
+    return composeAddress($('direccion').value, $('direccionExtra').value);
+}
+
+function rememberAddress() {
+    const savedUser = storage.get('pachoncito_user') || {};
+    const street = $('direccion').value.trim();
+    if (!street) return;
+    storage.set('pachoncito_user', { ...savedUser, address: fullAddress(), point: addressPicker.point || null });
+}
+
 function toggleDireccion() {
     const isHome = $('tipoEntrega').value === 'domicilio';
     $('direccionBox').hidden = !isHome;
     $('direccion').required = isHome;
+    if (isHome) addressPicker.refresh();
     updateSummary();
 }
 
@@ -216,7 +237,11 @@ function prefill() {
     const savedUser = storage.get('pachoncito_user') || {};
     $('nombre').value = profile.name || savedUser.name || '';
     $('telefono').value = profile.phone || '';
-    $('direccion').value = savedUser.address || profile.address || '';
+    const { street, extra } = splitAddress(savedUser.address || profile.address || '');
+    $('direccion').value = street;
+    $('direccionExtra').value = extra;
+    // El punto que confirmó la última vez, si la dirección no ha cambiado
+    if (savedUser.point && savedUser.address && street) addressPicker.set(savedUser.point);
 }
 
 // El botón de reservar solo se activa con el obrador abierto y un teléfono válido
@@ -232,7 +257,7 @@ function renderStore(open, { welcomeGift = false } = {}) {
     renderWelcomeGift();
     $('closedBanner').hidden = open;
     form.classList.toggle('is-closed', !open);
-    form.querySelectorAll('.counter button, #tipoEntrega, #hora, #direccion').forEach(control => { control.disabled = !open; });
+    form.querySelectorAll('.counter button, #tipoEntrega, #hora, #direccion, #direccionExtra').forEach(control => { control.disabled = !open; });
     syncSubmit();
 }
 
@@ -276,7 +301,7 @@ form.addEventListener('submit', async event => {
         if (quantities.clasico + quantities.bocadillo === 0) return fail('Selecciona al menos un pandebono para tu pedido.');
         const cart = new URLSearchParams({ c: quantities.clasico, b: quantities.bocadillo, e: order.deliveryMethod });
         if (hora) cart.set('h', hora);
-        if (direccion) storage.set('pachoncito_user', { ...(storage.get('pachoncito_user') || {}), address: direccion });
+        rememberAddress();
         location.href = loginUrl(`index.html?${cart}`);
         return;
     }
@@ -284,7 +309,7 @@ form.addEventListener('submit', async event => {
     if (nombre.length < 2) return fail('Escribe tu nombre y apellidos.', $('nombre'));
     if (!storeOpen) return fail('El obrador descansa ahora mismo: no hay reservas activas. ¡Volvemos pronto!');
     if (quantities.clasico + quantities.bocadillo === 0) return fail('Selecciona al menos un pandebono para tu pedido.');
-    if (order.deliveryMethod === 'domicilio' && direccion.length < 5) return fail('Introduce tu dirección exacta en Premià de Mar.', $('direccion'));
+    if (order.deliveryMethod === 'domicilio' && direccion.length < 5) return fail('Escribe tu calle y número en Premià de Mar.', $('direccion'));
     if (!hora) return fail('Selecciona una hora de entrega.', $('hora'));
 
     submitBtn.disabled = true;
@@ -298,13 +323,16 @@ form.addEventListener('submit', async event => {
         const missing = await missingWelcomeLocks(db, welcome.lockIds);
         welcome.missing = missing;
         gift = welcomeEligible(missing);
+        // Punto exacto de entrega: el que confirmó en el mapa o, si no eligió sugerencia, el de la calle escrita
+        const destination = order.deliveryMethod === 'domicilio' ? await addressPicker.resolve() : null;
         const orderData = buildOrder({
             uid: session.uid,
             name: nombre,
             phone: profile.phone,
             items: quantities,
             deliveryMethod: order.deliveryMethod,
-            address: direccion,
+            address: fullAddress(),
+            destination,
             slot: hora,
             test: session.isTest,
             creditsToRedeem: napasToRedeem,
@@ -326,7 +354,8 @@ form.addEventListener('submit', async event => {
         renderNapaRedeem();
 
         const savedUser = storage.get('pachoncito_user') || {};
-        storage.set('pachoncito_user', { ...savedUser, name: nombre, address: direccion || savedUser.address || '' });
+        storage.set('pachoncito_user', { ...savedUser, name: nombre });
+        if (order.deliveryMethod === 'domicilio') rememberAddress();
 
         form.reset();
         setQty('clasico', 0);
