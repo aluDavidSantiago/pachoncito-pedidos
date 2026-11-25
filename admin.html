@@ -10,7 +10,7 @@
     <link rel="icon" href="icons/favicon-light-48.png" media="(prefers-color-scheme: light)">
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     <title>Pachoncito | Obrador</title>
-    <link rel="stylesheet" href="style.css?v=2.7.0">
+    <link rel="stylesheet" href="style.css?v=2.8.0">
 </head>
 <body class="admin-page">
     <div class="admin-container">
@@ -120,12 +120,33 @@
                 </div>
             </section>
 
+            <!-- Horno por horas (oven.js): plan de hornadas del domingo y capacidad que limita las horas de la carta -->
+            <section class="dash-section" aria-labelledby="ovenTitle">
+                <div class="dash-section-head">
+                    <h2 id="ovenTitle" class="section-title">Horno por horas</h2>
+                    <span class="delivery-status" id="ovenStatus" data-state="idle">—</span>
+                </div>
+                <div id="ovenPanel" class="oven-panel"></div>
+                <details class="panel-box oven-settings">
+                    <summary>Ajustes del horno</summary>
+                    <form id="ovenForm" class="oven-form" novalidate>
+                        <div class="field"><label for="ovenTrays">Bandejas por hora</label><input type="number" id="ovenTrays" min="1" max="12" inputmode="numeric"></div>
+                        <div class="field"><label for="ovenUnits">Pandebonos por bandeja</label><input type="number" id="ovenUnits" min="1" max="100" inputmode="numeric"></div>
+                        <div class="field"><label for="ovenFresh">Hornear como mucho (horas antes)</label><input type="number" id="ovenFresh" min="1" max="12" inputmode="numeric"></div>
+                        <button type="submit" class="btn btn-primary btn-small">Guardar</button>
+                        <p class="hint oven-form-hint" id="ovenFormHint"></p>
+                    </form>
+                </details>
+            </section>
+
             <!-- Reparto en directo (admin-delivery.js): ubicación del repartidor y tiempo de llegada para cada cliente -->
             <section class="dash-section" aria-labelledby="deliveryTitle">
                 <div class="dash-section-head">
                     <h2 id="deliveryTitle" class="section-title">Reparto</h2>
                     <span class="delivery-status" id="deliveryStatus" data-state="idle">Sin reparto</span>
                 </div>
+                <!-- Navegación mientras repartes (admin-nav.js): sin salir del panel, para que siga enviando tu ubicación -->
+                <div id="deliveryNav" class="delivery-nav" hidden></div>
                 <div id="deliveryPanel" class="delivery-panel" aria-live="polite">
                     <p class="loading-state">Cargando pedidos…</p>
                 </div>
@@ -251,6 +272,6 @@
         </div>
     </dialog>
 
-    <script type="module" src="admin.js?v=2.7.0"></script>
+    <script type="module" src="admin.js?v=2.8.0"></script>
 </body>
 </html>

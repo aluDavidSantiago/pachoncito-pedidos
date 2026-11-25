@@ -24,6 +24,9 @@ rules_version = '2';
 //   tracking/{idPedido}      Reparto en directo: posición del repartidor, destino y tiempo estimado de ESE pedido.
 //                            Solo existe mientras el pedido está «En reparto» (el panel lo crea al salir y lo borra
 //                            al entregar o al terminar el reparto). Solo lo lee el cliente dueño del pedido.
+//   ovenLoad/{domingo}       { units: { '10:00': 12, … } } Pandebonos por hornear en cada franja de ese domingo (oven.js).
+//                            Público (solo números). Cada pedido suma exactamente sus pandebonos a su franja en el mismo
+//                            lote; el panel lo recalcula con los pedidos reales.
 //   reviews/{idPedido}       Públicas y anónimas. Una por pedido entregado (el cliente elige qué sabor valora)
 //                            y cada una da 1 ñapa. Las antiguas (uid_producto) y las de prueba (seed_*) se conservan.
 //   reviewAuthors/{id}       Privado. Vincula cada reseña con su autor (solo lo ve el obrador).
@@ -381,6 +384,40 @@ service cloud.firestore {
       allow get: if signedIn()
         && get(orderPath(orderId)).data.get('uid', '') == request.auth.uid;
       allow read, write: if isAdmin();
+    }
+
+    // ---------- Carga del horno por franja ----------
+
+    // Pandebonos que hay que hornear para un pedido (igual que orderUnits() de oven.js)
+    function ovenUnits(o) {
+      return o.items.clasico + o.items.bocadillo + o.napaCount
+        + (o.get('welcomeGift', false) == true ? 1 : 0) + o.get('creditsToRedeem', 0);
+    }
+
+    // Un cliente solo puede sumar SU pedido nuevo (creado en este mismo lote) a SU franja, y exactamente sus pandebonos
+    function validOvenIncrement() {
+      let d = request.resource.data;
+      let before = resource == null ? {} : resource.data.get('units', {});
+      let orderId = d.get('lastOrder', '');
+      let o = getAfter(orderPath(orderId)).data;
+      return d.keys().hasAll(['units', 'lastOrder', 'updatedAt'])
+        && d.keys().hasOnly(['units', 'lastOrder', 'updatedAt'])
+        && d.updatedAt == request.time
+        && d.units is map
+        && orderId is string && orderId.size() > 0
+        && !exists(orderPath(orderId))
+        && existsAfter(orderPath(orderId))
+        && o.uid == request.auth.uid
+        && d.units.diff(before).affectedKeys().hasOnly([o.deliverySlot])
+        && d.units[o.deliverySlot] == before.get(o.deliverySlot, 0) + ovenUnits(o);
+    }
+
+    match /ovenLoad/{day} {
+      allow read: if true;
+      allow create, update: if signedIn()
+        && day.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+        && validOvenIncrement();
+      allow write: if isAdmin(); // el panel la corrige con los pedidos reales
     }
 
     // ---------- Reseñas ----------

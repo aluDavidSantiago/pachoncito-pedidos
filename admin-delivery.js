@@ -13,6 +13,7 @@ import {
     deleteDoc, doc, serverTimestamp, updateDoc, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { distanceMeters, formatDistance, formatMinutes, isPoint, straightLineEtaSeconds } from "./geo.js";
+import { createNav, stepsFromRoute } from "./admin-nav.js";
 import { icon } from "./icons.js";
 import { el, withBusy } from "./shared.js";
 
@@ -39,7 +40,8 @@ const STREET_TYPES = [
 const OPEN_FOR_DELIVERY = ['pending', 'preparing', 'ready'];
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-export function createDelivery({ db, root, onDeliver, toast }) {
+export function createDelivery({ db, root, navRoot, onDeliver, toast }) {
+    const nav = navRoot ? createNav(navRoot) : null;
     let allOrders = [];
     let sundayOrders = [];
     const selected = new Map();     // id → marcado en la lista de «Salgo a repartir» (por defecto sí)
@@ -143,12 +145,12 @@ export function createDelivery({ db, root, onDeliver, toast }) {
                 const coords = [from, order.destination].map(p => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join(';');
                 const controller = new AbortController();
                 const timer = setTimeout(() => controller.abort(), 8000);
-                const response = await fetch(`${OSRM_URL}${coords}?overview=simplified&geometries=polyline&alternatives=false&steps=false`, { signal: controller.signal });
+                const response = await fetch(`${OSRM_URL}${coords}?overview=full&geometries=polyline&alternatives=false&steps=true`, { signal: controller.signal });
                 clearTimeout(timer);
                 const data = await response.json();
                 const route = data.routes?.[0];
                 if (data.code !== 'Ok' || !route) throw new Error(data.code || 'OSRM');
-                result.set(order.id, { seconds: Math.round(route.duration), distance: Math.round(route.distance), method: 'osrm', route: route.geometry || null });
+                result.set(order.id, { seconds: Math.round(route.duration), distance: Math.round(route.distance), method: 'osrm', route: route.geometry || null, steps: stepsFromRoute(route) });
             } catch (error) {
                 console.warn('OSRM no disponible; se estima en línea recta:', error);
                 result.set(order.id, {
@@ -185,7 +187,7 @@ export function createDelivery({ db, root, onDeliver, toast }) {
             await Promise.allSettled(stops.map(order => updateDoc(doc(db, 'tracking', order.id), {
                 courier,
                 updatedAt: serverTimestamp(),
-                ...(etaUpdate?.has(order.id) ? (({ route, ...eta }) => ({ eta, route, etaAt: serverTimestamp() }))(etaUpdate.get(order.id)) : {})
+                ...(etaUpdate?.has(order.id) ? (({ route, steps, ...eta }) => ({ eta, route, etaAt: serverTimestamp() }))(etaUpdate.get(order.id)) : {})
             })));
             lastSent = { lat: courier.lat, lng: courier.lng, at: now };
         } catch (error) {
@@ -199,6 +201,7 @@ export function createDelivery({ db, root, onDeliver, toast }) {
     function onPosition(pos) {
         gpsError = '';
         position = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, at: Date.now() };
+        updateNav();
         send();
     }
 
@@ -375,7 +378,13 @@ export function createDelivery({ db, root, onDeliver, toast }) {
                 ? el('span', { className: 'meta-accent', text: 'Dirección no encontrada en el mapa: el cliente ve tu posición, pero no el tiempo de llegada.' })
                 : null,
             el('div', { className: 'actions-bar' },
-                el('a', { className: 'btn btn-secondary btn-small', href: mapsUrl, target: '_blank', rel: 'noopener' }, icon('route'), 'Cómo llegar'),
+                el('a', {
+                    className: 'btn btn-secondary btn-small', href: mapsUrl, target: '_blank', rel: 'noopener',
+                    // En el iPhone, fuera del panel Safari deja de enviar la ubicación: se avisa antes de salir
+                    onClick: event => {
+                        if (/iPhone|iPod/.test(navigator.userAgent) && !confirm('Mientras estés en Google Maps, el iPhone deja de enviar tu ubicación al cliente. La ruta ya la tienes arriba, en este panel. ¿Abrir Google Maps igualmente?')) event.preventDefault();
+                    }
+                }, icon('route'), 'Google Maps'),
                 order.phoneKey ? el('a', { className: 'btn btn-secondary btn-small', href: `tel:${order.phoneKey}` }, 'Llamar') : null,
                 el('button', { type: 'button', className: 'btn btn-primary btn-small', onClick: event => onDeliver(order, event.currentTarget) }, icon('check'), 'Entregado')));
     }
@@ -402,7 +411,16 @@ export function createDelivery({ db, root, onDeliver, toast }) {
             }, icon('car'), isAdding ? 'Añadir al reparto' : 'Salgo a repartir'));
     }
 
+    // Navegación en el panel: la siguiente entrega es la más cercana en tiempo
+    function updateNav() {
+        if (!nav) return;
+        const stops = active().sort((a, b) => (etas.get(a.id)?.seconds ?? Infinity) - (etas.get(b.id)?.seconds ?? Infinity));
+        if (!stops.length || !watching()) { nav.stop(); return; }
+        nav.update(position, stops, etas);
+    }
+
     function render() {
+        updateNav();
         const stops = active().sort((a, b) => (etas.get(a.id)?.seconds ?? Infinity) - (etas.get(b.id)?.seconds ?? Infinity));
         const children = [];
         if (stops.length) {

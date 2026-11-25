@@ -54,8 +54,10 @@ export async function enrollBiometric(user) {
             authenticatorSelection: {
                 authenticatorAttachment: 'platform',
                 userVerification: 'required',
-                residentKey: 'discouraged'
+                residentKey: 'preferred'
             },
+            // Pista para el sistema: la llave va en ESTE dispositivo (llavero del iPhone / iCloud), no en otro proveedor
+            hints: ['client-device'],
             attestation: 'none',
             timeout: 60000
         }
@@ -70,7 +72,9 @@ export async function verifyBiometric(enrollment) {
     await navigator.credentials.get({
         publicKey: {
             challenge: randomChallenge(),
-            allowCredentials: [{ type: 'public-key', id: fromBase64Url(enrollment.credentialId), transports: ['internal'] }],
+            // Sin limitar «transports»: si la llave se guardó en otro proveedor del dispositivo, también vale
+            allowCredentials: [{ type: 'public-key', id: fromBase64Url(enrollment.credentialId) }],
+            hints: ['client-device'],
             userVerification: 'required',
             timeout: 60000
         }

@@ -82,6 +82,36 @@ export function brandStyle(style, dark = false) {
     return style;
 }
 
+// MapLibre se carga solo cuando hace falta (carta a domicilio, panel de reparto). Versión fija con firma.
+const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
+const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
+let maplibrePromise = null;
+export function loadMapLibre() {
+    if (window.maplibregl) return Promise.resolve(window.maplibregl);
+    if (maplibrePromise) return maplibrePromise;
+    maplibrePromise = new Promise((resolve, reject) => {
+        const css = Object.assign(document.createElement('link'), { rel: 'stylesheet', href: MAPLIBRE_CSS, crossOrigin: 'anonymous',
+            integrity: 'sha384-MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V' });
+        const js = Object.assign(document.createElement('script'), { src: MAPLIBRE_JS, crossOrigin: 'anonymous',
+            integrity: 'sha384-SYKAG6cglRMN0RVvhNeBY0r3FYKNOJtznwA0v7B5Vp9tr31xAHsZC0DqkQ/pZDmj' });
+        js.onload = () => resolve(window.maplibregl);
+        js.onerror = () => { maplibrePromise = null; reject(new Error('No se pudo cargar el mapa')); };
+        document.head.append(css, js);
+    });
+    return maplibrePromise;
+}
+
+// Estilo de la marca listo para usar (si OpenFreeMap no responde, un fondo liso)
+export async function brandMapStyle(dark = matchMedia('(prefers-color-scheme: dark)').matches) {
+    try {
+        const response = await fetch(MAP_STYLE_URL);
+        if (!response.ok) throw new Error(String(response.status));
+        return brandStyle(await response.json(), dark);
+    } catch {
+        return { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': dark ? '#16120f' : '#efe7da' } }] };
+    }
+}
+
 // Decodifica una polilínea de OSRM (precisión 5) a [[lng, lat], …]
 export function decodePolyline(encoded, precision = 5) {
     const factor = 10 ** precision;
