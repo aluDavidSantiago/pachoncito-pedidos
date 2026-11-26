@@ -68,17 +68,26 @@ export async function enrollBiometric(user) {
 }
 
 // Pide Face ID / Touch ID. Lanza un error si el usuario cancela o la verificación falla.
+// Sin «allowCredentials»: el sistema ofrece cualquier llave del obrador guardada para este dominio. Así vale
+// también la del iPad que el llavero de iCloud ha copiado al iPhone (antes solo se aceptaba la creada en este
+// mismo dispositivo y, si esa se había guardado en Google o se había perdido, el iPhone decía «no tienes
+// ninguna llave»). Se acepta si es la registrada aquí o si pertenece a la cuenta del obrador (userHandle = uid).
 export async function verifyBiometric(enrollment) {
-    await navigator.credentials.get({
+    const credential = await navigator.credentials.get({
         publicKey: {
             challenge: randomChallenge(),
-            // Sin limitar «transports»: si la llave se guardó en otro proveedor del dispositivo, también vale
-            allowCredentials: [{ type: 'public-key', id: fromBase64Url(enrollment.credentialId) }],
             hints: ['client-device'],
             userVerification: 'required',
             timeout: 60000
         }
     });
+    const handle = credential?.response?.userHandle;
+    const owner = handle && handle.byteLength ? new TextDecoder().decode(handle) : null;
+    const sameKey = credential && toBase64Url(credential.rawId) === enrollment.credentialId;
+    if (!sameKey && owner !== enrollment.uid) {
+        throw Object.assign(new Error('Llave de otra cuenta'), { name: 'WrongAccountError' });
+    }
+    if (!sameKey) storage.set(ENROLLMENT_KEY, { ...enrollment, credentialId: toBase64Url(credential.rawId) });
     markUnlocked();
 }
 
@@ -88,6 +97,7 @@ export function forgetBiometric() {
 }
 
 export const declineBiometricOffer = () => storage.set(DECLINED_KEY, Date.now());
+export const clearBiometricDecline = () => storage.remove(DECLINED_KEY);
 export const biometricOfferDeclined = () => Boolean(storage.get(DECLINED_KEY));
 
 export function markUnlocked() {
@@ -104,7 +114,8 @@ export function isUnlocked() {
 
 export function biometricErrorMessage(error) {
     switch (error?.name) {
-        case 'NotAllowedError': return 'Verificación cancelada o no reconocida. Vuelve a intentarlo.';
+        case 'NotAllowedError': return 'Verificación cancelada o no reconocida. Vuelve a intentarlo. Si el iPhone dice que no tienes ninguna llave, pulsa «Usar contraseña»: al entrar te ofrecerá activar Face ID de nuevo.';
+        case 'WrongAccountError': return 'Esa llave no es la del obrador. Elige la de la cuenta del obrador o pulsa «Usar contraseña».';
         case 'InvalidStateError': return 'Este dispositivo ya tiene una credencial registrada para el panel.';
         case 'SecurityError': return 'El navegador no permite la biometría en esta dirección.';
         case 'NotSupportedError': return 'Este dispositivo no admite el acceso biométrico.';
