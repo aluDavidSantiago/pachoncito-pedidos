@@ -6,8 +6,8 @@
 // Al entregar un pedido o al terminar el reparto, su tracking se BORRA: la ubicación solo existe durante el reparto
 // y cada cliente solo puede leer la de su pedido (firestore.rules · tracking).
 //
-// Servicios externos gratuitos, llamados SOLO desde este móvil (nunca desde los clientes):
-//   · Nominatim (OpenStreetMap), y Photon si Nominatim no la encuentra: sitúan cada dirección una sola vez al salir.
+// Servicios externos, llamados SOLO desde este móvil (nunca desde los clientes):
+//   · Buscador de Google Maps (Places API New): sitúa una sola vez al salir los pedidos que no traen punto.
 //   · OSRM (demo pública): ruta y tiempo en coche hasta cada dirección, una vez por minuto (máx. 1 consulta por segundo).
 import {
     deleteDoc, doc, serverTimestamp, updateDoc, writeBatch
@@ -23,21 +23,9 @@ const SEND_MIN_MOVE_M = 10;        // …y solo si se ha movido 10 m
 const HEARTBEAT_MS = 30000;        // parado: se reenvía cada 30 s para que el cliente sepa que sigue conectado
 const ETA_EVERY_MS = 60000;        // tiempo estimado: una consulta a OSRM por minuto
 const OSRM_URL = 'https://router.project-osrm.org/route/v1/driving/';
-const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
-const PHOTON_URL = 'https://photon.komoot.io/api/';
 const TOWN = 'Premià de Mar';
 const TOWN_CENTER = { lat: 41.4917, lng: 2.3606 };
 const MAX_KM_FROM_TOWN = 15;       // un resultado más lejos es otro pueblo con una calle igual: se descarta
-// Caja aproximada de Premià de Mar y alrededores: da preferencia a resultados de la zona
-const VIEWBOX = '2.30,41.54,2.42,41.46';
-
-// Tipos de vía en castellano → catalán (en OpenStreetMap las calles de Premià están en catalán)
-const STREET_TYPES = [
-    [/^(c\/|c\.|cl\.?|calle)\s+/i, 'Carrer '], [/^(avda\.?|av\.?|avenida)\s+/i, 'Avinguda '], [/^(pza\.?|pl\.?|plaza)\s+/i, 'Plaça '],
-    [/^(pº|p\.º|paseo)\s+/i, 'Passeig '], [/^(camino)\s+/i, 'Camí '], [/^(pasaje|pje\.?)\s+/i, 'Passatge '], [/^(travesía|travesia)\s+/i, 'Travessera '],
-    [/^(carretera|ctra\.?)\s+/i, 'Carretera '], [/^(rambla)\s+/i, 'Rambla '], [/^(ronda)\s+/i, 'Ronda ']
-];
-
 const OPEN_FOR_DELIVERY = ['pending', 'preparing', 'ready'];
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -60,85 +48,20 @@ export function createDelivery({ db, root, navRoot, onDeliver, toast }) {
     const candidates = () => sundayOrders.filter(o => o.deliveryMethod === 'domicilio' && OPEN_FOR_DELIVERY.includes(o.status));
     const watching = () => watchId !== null;
 
-    // ---------- Direcciones (Nominatim y Photon) ----------
-
-    // «Calle Mayor 12, 2º 1ª» o «Calle Mayor, 12, bajos» → { street: 'Calle Mayor', number: '12' }
-    function parseAddress(raw) {
-        const parts = String(raw || '').split(',').map(part => part.trim()).filter(Boolean);
-        let text = parts[0] || '';
-        // Número después de la coma: «Calle Mayor, 12»
-        const numberAfter = parts[1]?.match(/^(?:n[ºo°.]?\s*)?(\d+[a-z]?)\b/i);
-        if (numberAfter && !/\d/.test(text)) text += ` ${numberAfter[1]}`;
-        text = text
-            .replace(/\b(piso|planta|puerta|pta\.?|esc\.?|escalera|bajos?|ático|atico|entresuelo|principal)\b.*$/i, '')
-            .replace(/(\d+[a-z]?)\s+\d+\s*[ºª°].*$/i, '$1')
-            .replace(/\s+/g, ' ')
-            .trim();
-        const match = text.match(/^(.*?)[\s,]+(?:n[ºo°.]?\s*)?(\d+[a-z]?)$/i) || text.match(/^(.*?)[\s,]+(?:n[ºo°.]?\s*)?(\d+[a-z]?)\b/i);
-        return match ? { street: match[1].trim(), number: match[2] } : { street: text, number: '' };
-    }
-
-    function catalanStreet(street) {
-        if (/^(carrer|avinguda|plaça|passeig|camí|passatge|travessera|carretera|rambla|ronda|via|riera)\b/i.test(street)) return street;
-        for (const [pattern, replacement] of STREET_TYPES) {
-            if (pattern.test(street)) return street.replace(pattern, replacement);
-        }
-        return `Carrer ${street}`;
-    }
+    // ---------- Direcciones (solo el buscador de Google, el mismo que usa la carta) ----------
 
     const nearTown = point => point && distanceMeters(point, TOWN_CENTER) <= MAX_KM_FROM_TOWN * 1000;
 
-    async function nominatim(params) {
-        const url = `${NOMINATIM_URL}?format=jsonv2&limit=1&countrycodes=es&accept-language=es&viewbox=${VIEWBOX}&${params}`;
-        const response = await fetch(url);
-        if (!response.ok) return null;
-        const [hit] = await response.json();
-        const point = hit ? { lat: Number(hit.lat), lng: Number(hit.lon) } : null;
-        return nearTown(point) ? point : null;
-    }
-
-    async function photon(query) {
-        const url = `${PHOTON_URL}?limit=1&lat=${TOWN_CENTER.lat}&lon=${TOWN_CENTER.lng}&q=${encodeURIComponent(query)}`;
-        const response = await fetch(url);
-        if (!response.ok) return null;
-        const [hit] = (await response.json()).features || [];
-        const [lng, lat] = hit?.geometry?.coordinates || [];
-        const point = Number.isFinite(lat) ? { lat, lng } : null;
-        return nearTown(point) ? point : null;
-    }
-
-    // Prueba de más exacta a menos: con número y sin él, en castellano y en catalán; si nada, Photon.
-    // Sin número se sitúa la calle (aproximado, pero suficiente para el tiempo de llegada).
+    // Pedidos sin punto en el mapa (antiguos o sin sugerencia elegida): se sitúan con Google. Si no se
+    // encuentra, el cliente ve «Va de camino a tu casa» y la posición del repartidor, sin mensajes de error.
     async function geocode(address) {
-        // Con clave de Google, primero su buscador (el mismo que usa la carta)
-        if (GOOGLE_MAPS_KEY) {
-            try {
-                const [best] = await suggestAddress(address.replace(/,?\s*08330.*$/i, ''));
-                const located = best && await pointOf(best);
-                if (located && isPoint(located.point) && nearTown(located.point)) return located.point;
-            } catch (error) {
-                console.warn('Google no ha encontrado la dirección:', error);
-            }
-        }
-        const { street, number } = parseAddress(address);
-        if (!street) return null;
-        const names = [...new Set([street, catalanStreet(street)])];
-        const attempts = [];
-        for (const name of names) {
-            if (number) attempts.push(() => nominatim(`street=${encodeURIComponent(`${number} ${name}`)}&city=${encodeURIComponent(TOWN)}`));
-        }
-        for (const name of names) attempts.push(() => nominatim(`street=${encodeURIComponent(name)}&city=${encodeURIComponent(TOWN)}`));
-        attempts.push(() => nominatim(`q=${encodeURIComponent(`${address}, ${TOWN}`)}`));
-        for (const name of names) attempts.push(() => photon(`${name} ${number}, ${TOWN}`.replace(/\s+,/, ',')));
-
-        for (let i = 0; i < attempts.length; i++) {
-            if (i) await sleep(1100); // Nominatim: máximo una consulta por segundo
-            try {
-                const point = await attempts[i]();
-                if (point) return point;
-            } catch (error) {
-                console.warn('Búsqueda de dirección fallida:', error);
-            }
+        if (!GOOGLE_MAPS_KEY || !address) return null;
+        try {
+            const [best] = await suggestAddress(String(address).replace(/,?\s*08330.*$/i, ''));
+            const located = best && await pointOf(best);
+            if (located && isPoint(located.point) && nearTown(located.point)) return located.point;
+        } catch (error) {
+            console.warn('Google no ha encontrado la dirección:', error);
         }
         return null;
     }
@@ -292,7 +215,7 @@ export function createDelivery({ db, root, navRoot, onDeliver, toast }) {
             let lookups = 0;
             for (const order of chosen) {
                 if (isPoint(order.destination)) continue;
-                if (lookups++) await sleep(1100); // Nominatim: máximo una consulta por segundo
+                if (lookups++) await sleep(300); // una búsqueda tras otra, sin prisas
                 const point = await geocode(order.address);
                 order.destination = point;
                 if (point) await updateDoc(doc(db, 'orders', order.id), { destination: point });

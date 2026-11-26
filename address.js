@@ -1,16 +1,15 @@
 // Dirección de entrega en la carta: sugerencias de direcciones reales de Premià de Mar con el buscador de
-// Google Maps (Places API New, si hay clave en shared.js · GOOGLE_MAPS_KEY) o, si no, Photon (OpenStreetMap),
+// Google Maps (Places API New, clave en shared.js · GOOGLE_MAPS_KEY; solo Google, sin otro buscador),
 // y un mini mapa con un alfiler que el cliente confirma o arrastra hasta su puerta.
 // El punto confirmado se guarda en el pedido (destination): el reparto y el seguimiento lo usan tal cual,
 // sin volver a buscar la dirección. Si no se confirma, el panel la busca como antes (admin-delivery.js).
 import { isPoint } from "./geo.js";
 import { icon } from "./icons.js";
-import { brandMapStyle, loadMapLibre, PREMIA_CENTER } from "./map-style.js";
+import { brandMapStyle, loadMapLibre } from "./map-style.js";
 import { el, GOOGLE_MAPS_KEY } from "./shared.js";
 
 export const TOWN = 'Premià de Mar';
 export const POSTCODE = '08330';
-const PHOTON_URL = 'https://photon.komoot.io/api/';
 // Premià de Mar y un margen alrededor: también lo comprueban las reglas (isDeliveryPoint)
 export const ZONE = { minLat: 41.47, maxLat: 41.51, minLng: 2.33, maxLng: 2.39 };
 export const inZone = p => isPoint(p) && p.lat >= ZONE.minLat && p.lat <= ZONE.maxLat && p.lng >= ZONE.minLng && p.lng <= ZONE.maxLng;
@@ -69,47 +68,24 @@ async function googlePlace(placeId) {
     return { point: { lat: data.location?.latitude, lng: data.location?.longitude }, label: data.shortFormattedAddress || '' };
 }
 
-// Sugerencias: Google si hay clave; si no hay o falla, OpenStreetMap
+// Sugerencias: solo el buscador de Google Maps. Si Google no responde, no salen sugerencias (sin error):
+// el cliente escribe su dirección a mano y puede reservar igual (el reparto la sitúa después).
 export async function suggest(query, signal) {
-    if (GOOGLE_MAPS_KEY) {
-        try {
-            return await googleSuggest(query, signal);
-        } catch (error) {
-            if (error.name === 'AbortError') throw error;
-            console.warn('Google no disponible; se usa OpenStreetMap:', error);
-        }
+    if (!GOOGLE_MAPS_KEY) return [];
+    try {
+        return await googleSuggest(query, signal);
+    } catch (error) {
+        if (error.name === 'AbortError') throw error;
+        console.warn('Buscador de Google no disponible:', error);
+        return [];
     }
-    return photonSuggest(query, signal);
 }
 
-// Punto de una sugerencia (las de Google se piden al elegirla)
+// Punto de una sugerencia (se pide a Google al elegirla)
 export async function pointOf(item) {
     if (item.point) return item;
     const place = await googlePlace(item.placeId);
     return { ...item, point: place.point };
-}
-
-// ---------- Sugerencias con OpenStreetMap (Photon), de reserva ----------
-
-function label(props) {
-    const street = props.street || props.name || '';
-    const number = props.housenumber ? ` ${props.housenumber}` : '';
-    return { title: `${street}${number}`.trim(), sub: [props.postcode, props.city || props.district].filter(Boolean).join(' ') };
-}
-
-async function photonSuggest(query, signal) {
-    const url = `${PHOTON_URL}?limit=6&lang=es&lat=${PREMIA_CENTER[1]}&lon=${PREMIA_CENTER[0]}`
-        + `&bbox=${ZONE.minLng},${ZONE.minLat},${ZONE.maxLng},${ZONE.maxLat}&layer=house&layer=street`
-        + `&q=${encodeURIComponent(`${query} ${TOWN}`)}`;
-    const response = await fetch(url, { signal });
-    if (!response.ok) return [];
-    const data = await response.json();
-    const seen = new Set();
-    return (data.features || []).map(f => {
-        const [lng, lat] = f.geometry?.coordinates || [];
-        const { title, sub } = label(f.properties || {});
-        return { title, sub, point: { lat, lng }, hasNumber: Boolean(f.properties?.housenumber) };
-    }).filter(s => s.title && inZone(s.point) && !seen.has(s.title) && seen.add(s.title));
 }
 
 // ---------- Mini mapa con alfiler ----------
