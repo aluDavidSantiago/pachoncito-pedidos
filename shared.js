@@ -2,7 +2,7 @@
 // IMPORTANTE: los precios y la regla de ñapas también están en firestore.rules; si cambian aquí, cámbialos allí.
 
 // Versión visible en el pie de todas las páginas (ui.js · mountVersion). Al cambiarla, sube también CACHE_VERSION en sw.js.
-export const APP_VERSION = '3.0.1';
+export const APP_VERSION = '3.0.2';
 
 export const PRICES_CENTS = { clasico: 150, bocadillo: 170 };
 export const DELIVERY_CENTS = 100;
@@ -18,7 +18,7 @@ export const PRODUCT_NAMES = {
 // (p. ej. '34600123456'); si se deja vacío, el botón de WhatsApp no se muestra.
 // Clave de Google Maps Platform para el buscador de direcciones (Places API New). Es pública en el navegador:
 // la protege la restricción de la clave a pachoncito.es en Google Cloud. Vacía = se usa OpenStreetMap (Photon).
-export const GOOGLE_MAPS_KEY = '';
+export const GOOGLE_MAPS_KEY = 'AIzaSyAN6hSwdWaTtX47Xkh860UxZaHLCr34mZg';
 
 export const CONTACT = {
     instagram: 'pachoncito_oficial',

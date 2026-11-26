@@ -25,8 +25,9 @@ Publicada en **https://pachoncito.es** (GitHub Pages desde `main`) con Firebase 
   solo ofrece horas con horno libre; `ovenLoad/{domingo}`; plan de hornadas en el panel.
 - Dirección: sugerencias (Google Places si `GOOGLE_MAPS_KEY` en shared.js; si no, Photon/OpenStreetMap) + alfiler en
   mini mapa; el punto se guarda en el pedido (`destination`).
-  **Pendiente:** el dueño tiene que crear la clave de Google (Places API New, restringida a `https://pachoncito.es/*`)
-  y pasarla para ponerla en `GOOGLE_MAPS_KEY`.
+  Clave de Google puesta (v3.0.2), restringida a `https://pachoncito.es/*` (comprobado: otras webs → PERMISSION_DENIED).
+  La cuenta de Google Cloud está en prueba gratuita de 90 días (desde 26-11-2026): antes de que acabe, el dueño debe
+  pulsar «Actualizar» o Google dejará de responder (la web volvería sola a Photon).
 - Reparto en directo: «Salgo a repartir», ubicación con watchPosition, `tracking/{pedido}` (se borra al entregar),
   mapa MapLibre + OpenFreeMap con los colores de la web, tiempo con OSRM, navegación dentro del panel (`admin-nav.js`).
 - Avisos de pedido nuevo: ntfy, canal `pachoncito-obrador-530e45db990a` (`notify.js`, sin datos personales).
