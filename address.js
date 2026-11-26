@@ -1,11 +1,12 @@
-// Dirección de entrega en la carta: sugerencias de calles reales de Premià de Mar (Photon · OpenStreetMap)
+// Dirección de entrega en la carta: sugerencias de direcciones reales de Premià de Mar con el buscador de
+// Google Maps (Places API New, si hay clave en shared.js · GOOGLE_MAPS_KEY) o, si no, Photon (OpenStreetMap),
 // y un mini mapa con un alfiler que el cliente confirma o arrastra hasta su puerta.
 // El punto confirmado se guarda en el pedido (destination): el reparto y el seguimiento lo usan tal cual,
 // sin volver a buscar la dirección. Si no se confirma, el panel la busca como antes (admin-delivery.js).
 import { isPoint } from "./geo.js";
 import { icon } from "./icons.js";
 import { brandMapStyle, loadMapLibre, PREMIA_CENTER } from "./map-style.js";
-import { el } from "./shared.js";
+import { el, GOOGLE_MAPS_KEY } from "./shared.js";
 
 export const TOWN = 'Premià de Mar';
 export const POSTCODE = '08330';
@@ -26,7 +27,69 @@ export function splitAddress(full) {
     return { street: parts[0] || '', extra: parts.slice(1).join(', ') };
 }
 
-// ---------- Sugerencias (Photon) ----------
+// ---------- Sugerencias con Google Maps (Places API New) ----------
+// Autocompletar + detalles en una misma «sesión»: Google cobra la sesión, no cada letra (y con poco uso, gratis).
+const GOOGLE_AUTOCOMPLETE = 'https://places.googleapis.com/v1/places:autocomplete';
+const GOOGLE_PLACE = 'https://places.googleapis.com/v1/places/';
+let sessionToken = null;
+const newSession = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
+
+async function googleSuggest(query, signal) {
+    sessionToken ||= newSession();
+    const response = await fetch(GOOGLE_AUTOCOMPLETE, {
+        method: 'POST',
+        signal,
+        headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': GOOGLE_MAPS_KEY },
+        body: JSON.stringify({
+            input: /premi[àa]/i.test(query) ? query : `${query}, ${TOWN}`,
+            languageCode: 'es',
+            regionCode: 'es',
+            includedRegionCodes: ['es'],
+            locationRestriction: { rectangle: { low: { latitude: ZONE.minLat, longitude: ZONE.minLng }, high: { latitude: ZONE.maxLat, longitude: ZONE.maxLng } } },
+            sessionToken
+        })
+    });
+    if (!response.ok) throw new Error(`Google ${response.status}`);
+    const data = await response.json();
+    return (data.suggestions || []).map(s => s.placePrediction).filter(Boolean).map(p => ({
+        title: p.structuredFormat?.mainText?.text || p.text?.text || '',
+        sub: p.structuredFormat?.secondaryText?.text || TOWN,
+        placeId: p.placeId,
+        hasNumber: /\d/.test(p.structuredFormat?.mainText?.text || '')
+    })).filter(s => s.title && s.placeId);
+}
+
+// Coordenadas exactas de la sugerencia elegida (cierra la sesión de Google)
+async function googlePlace(placeId) {
+    const url = `${GOOGLE_PLACE}${encodeURIComponent(placeId)}?languageCode=es${sessionToken ? `&sessionToken=${sessionToken}` : ''}`;
+    sessionToken = null;
+    const response = await fetch(url, { headers: { 'X-Goog-Api-Key': GOOGLE_MAPS_KEY, 'X-Goog-FieldMask': 'location,shortFormattedAddress' } });
+    if (!response.ok) throw new Error(`Google ${response.status}`);
+    const data = await response.json();
+    return { point: { lat: data.location?.latitude, lng: data.location?.longitude }, label: data.shortFormattedAddress || '' };
+}
+
+// Sugerencias: Google si hay clave; si no hay o falla, OpenStreetMap
+export async function suggest(query, signal) {
+    if (GOOGLE_MAPS_KEY) {
+        try {
+            return await googleSuggest(query, signal);
+        } catch (error) {
+            if (error.name === 'AbortError') throw error;
+            console.warn('Google no disponible; se usa OpenStreetMap:', error);
+        }
+    }
+    return photonSuggest(query, signal);
+}
+
+// Punto de una sugerencia (las de Google se piden al elegirla)
+export async function pointOf(item) {
+    if (item.point) return item;
+    const place = await googlePlace(item.placeId);
+    return { ...item, point: place.point };
+}
+
+// ---------- Sugerencias con OpenStreetMap (Photon), de reserva ----------
 
 function label(props) {
     const street = props.street || props.name || '';
@@ -34,7 +97,7 @@ function label(props) {
     return { title: `${street}${number}`.trim(), sub: [props.postcode, props.city || props.district].filter(Boolean).join(' ') };
 }
 
-export async function suggest(query, signal) {
+async function photonSuggest(query, signal) {
     const url = `${PHOTON_URL}?limit=6&lang=es&lat=${PREMIA_CENTER[1]}&lon=${PREMIA_CENTER[0]}`
         + `&bbox=${ZONE.minLng},${ZONE.minLat},${ZONE.maxLng},${ZONE.maxLat}&layer=house&layer=street`
         + `&q=${encodeURIComponent(`${query} ${TOWN}`)}`;
@@ -120,10 +183,17 @@ export function mountAddressPicker({ input, list, mapBox, hint, onChange }) {
         active = -1;
     }
 
-    function choose(item) {
+    async function choose(item) {
         input.value = item.hasNumber ? item.title : mergeNumber(item.title, input.value);
         close();
-        setPoint(item.point);
+        try {
+            const located = await pointOf(item);
+            setPoint(located.point);
+            if (!point) hint.textContent = 'Esa dirección queda fuera de Premià de Mar. Revisa la calle, por favor.';
+        } catch (error) {
+            console.warn('No se pudo situar la dirección:', error);
+            hint.textContent = 'No hemos podido situar la dirección. Puedes reservar igualmente.';
+        }
     }
 
     // Si la sugerencia es solo la calle, se conserva el número que escribió el cliente
@@ -186,7 +256,7 @@ export function mountAddressPicker({ input, list, mapBox, hint, onChange }) {
             if (point || input.value.trim().length < 5) return point;
             try {
                 const [best] = await suggest(input.value.trim());
-                if (best) setPoint(best.point, { fly: false });
+                if (best) setPoint((await pointOf(best)).point, { fly: false });
             } catch { /* sin conexión con el buscador: el panel la buscará después */ }
             return point;
         },

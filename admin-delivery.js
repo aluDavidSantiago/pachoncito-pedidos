@@ -13,9 +13,10 @@ import {
     deleteDoc, doc, serverTimestamp, updateDoc, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { distanceMeters, formatDistance, formatMinutes, isPoint, straightLineEtaSeconds } from "./geo.js";
+import { pointOf, suggest as suggestAddress } from "./address.js";
 import { createNav, stepsFromRoute } from "./admin-nav.js";
 import { icon } from "./icons.js";
-import { el, withBusy } from "./shared.js";
+import { el, GOOGLE_MAPS_KEY, withBusy } from "./shared.js";
 
 const SEND_EVERY_MS = 8000;        // como mucho, una posición cada 8 s…
 const SEND_MIN_MOVE_M = 10;        // …y solo si se ha movido 10 m
@@ -109,6 +110,16 @@ export function createDelivery({ db, root, navRoot, onDeliver, toast }) {
     // Prueba de más exacta a menos: con número y sin él, en castellano y en catalán; si nada, Photon.
     // Sin número se sitúa la calle (aproximado, pero suficiente para el tiempo de llegada).
     async function geocode(address) {
+        // Con clave de Google, primero su buscador (el mismo que usa la carta)
+        if (GOOGLE_MAPS_KEY) {
+            try {
+                const [best] = await suggestAddress(address.replace(/,?\s*08330.*$/i, ''));
+                const located = best && await pointOf(best);
+                if (located && isPoint(located.point) && nearTown(located.point)) return located.point;
+            } catch (error) {
+                console.warn('Google no ha encontrado la dirección:', error);
+            }
+        }
         const { street, number } = parseAddress(address);
         if (!street) return null;
         const names = [...new Set([street, catalanStreet(street)])];

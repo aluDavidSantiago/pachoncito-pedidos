@@ -2,7 +2,7 @@
 // Estrategia "red primero": siempre se sirve la versión publicada más reciente y la caché solo se usa sin conexión,
 // así nunca se mezclan archivos de versiones distintas tras un despliegue.
 // Sube CACHE_VERSION si cambias la lista de archivos de SHELL.
-const CACHE_VERSION = 'pachoncito-v25';
+const CACHE_VERSION = 'pachoncito-v26';
 
 const SHELL = [
     './',
