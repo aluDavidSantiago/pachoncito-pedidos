@@ -7,7 +7,7 @@ Publicada en **https://pachoncito.es** (GitHub Pages desde `main`) con Firebase 
 ## Cómo trabajar (lo que el dueño espera)
 - Rama de trabajo: `claude/pandebono-welcome-first-order-vuh000`, sincronizada desde `origin/main` antes de empezar.
 - Probar SIEMPRE antes de publicar: emuladores de Firebase (`firebase emulators:exec --only auth,firestore`) + Playwright
-  en el navegador. Hay que simular las CDN/servicios externos (gstatic, unpkg, OpenFreeMap, Photon, OSRM, Google, ntfy):
+  en el navegador. Hay que simular las CDN/servicios externos (gstatic, unpkg, OpenFreeMap, OSRM, ntfy; Google Places sí responde si se manda Referer pachoncito.es):
   desde el entorno de Claude no son accesibles.
 - Publicar = PR a `main` y fusionarlo (el dueño lo ha autorizado repetidamente). Subir `APP_VERSION` (shared.js),
   los `?v=` de los HTML y `CACHE_VERSION` en sw.js en cada versión.
@@ -23,11 +23,11 @@ Publicada en **https://pachoncito.es** (GitHub Pages desde `main`) con Firebase 
 - Ñapas (cada 10 €, por invitar, por reseñar) y canje.
 - **Horno por horas** (`oven.js`): 2 bandejas × 16 por hora, hasta 2 h de antelación (ajustable en el panel); la carta
   solo ofrece horas con horno libre; `ovenLoad/{domingo}`; plan de hornadas en el panel.
-- Dirección: sugerencias (Google Places si `GOOGLE_MAPS_KEY` en shared.js; si no, Photon/OpenStreetMap) + alfiler en
+- Dirección: sugerencias SOLO con Google Places (`GOOGLE_MAPS_KEY` en shared.js; el dueño no quiere Photon/OSM) + alfiler en
   mini mapa; el punto se guarda en el pedido (`destination`).
   Clave de Google puesta (v3.0.2), restringida a `https://pachoncito.es/*` (comprobado: otras webs → PERMISSION_DENIED).
   La cuenta de Google Cloud está en prueba gratuita de 90 días (desde 26-11-2026): antes de que acabe, el dueño debe
-  pulsar «Actualizar» o Google dejará de responder (la web volvería sola a Photon).
+  pulsar «Actualizar» o Google dejará de responder (no saldrían sugerencias de dirección).
 - Reparto en directo: «Salgo a repartir», ubicación con watchPosition, `tracking/{pedido}` (se borra al entregar),
   mapa MapLibre + OpenFreeMap con los colores de la web, tiempo con OSRM, navegación dentro del panel (`admin-nav.js`).
 - Avisos de pedido nuevo: ntfy, canal `pachoncito-obrador-530e45db990a` (`notify.js`, sin datos personales).
