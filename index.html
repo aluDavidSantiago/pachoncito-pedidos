@@ -7,6 +7,18 @@
     <meta name="theme-color" content="#110e0c" media="(prefers-color-scheme: dark)">
     <meta name="description" content="Auténticos pandebonos colombianos en Premià de Mar, horneados cada domingo. Reserva online: recogida en el obrador o envío a domicilio.">
     <link rel="canonical" href="https://pachoncito.es/">
+    <!-- Ficha de negocio para buscadores (Google): panadería artesana en Premià de Mar -->
+    <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"Bakery","name":"Pachoncito","url":"https://pachoncito.es/",
+     "image":"https://pachoncito.es/img/og-pachoncito.jpg","logo":"https://pachoncito.es/icons/icon-512.png",
+     "description":"Auténticos pandebonos colombianos horneados cada domingo en Premià de Mar. Reserva online, recogida o envío a domicilio.",
+     "servesCuisine":"Colombiana","priceRange":"€",
+     "address":{"@type":"PostalAddress","addressLocality":"Premià de Mar","postalCode":"08330","addressRegion":"Barcelona","addressCountry":"ES"},
+     "areaServed":"Premià de Mar","sameAs":["https://www.instagram.com/pachoncito_oficial"],
+     "hasMenu":{"@type":"Menu","hasMenuSection":{"@type":"MenuSection","name":"Pandebonos","hasMenuItem":[
+       {"@type":"MenuItem","name":"Pandebono Clásico","offers":{"@type":"Offer","price":"1.50","priceCurrency":"EUR"}},
+       {"@type":"MenuItem","name":"Pandebono con bocadillo de guayaba","offers":{"@type":"Offer","price":"1.70","priceCurrency":"EUR"}}]}}}
+    </script>
     <!-- Vista previa al compartir el enlace (Instagram, WhatsApp…) -->
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Pachoncito">
@@ -28,7 +40,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Pachoncito">
     <title>Pachoncito | Pedidos</title>
-    <link rel="stylesheet" href="style.css?v=2.8.1">
+    <link rel="stylesheet" href="style.css?v=3.0.0">
 </head>
 <body>
     <div class="container">
@@ -52,7 +64,16 @@
                 <picture class="brand-picture"><source srcset="icons/logo-tinta.png" media="(prefers-color-scheme: light)"><img src="icons/logo-blanco.png" alt="Pachoncito" class="brand-logo" width="300" height="73"></picture>
             </div>
             <div class="badge">Reservas de lunes a viernes · Entregas los domingos</div>
+            <!-- Nota media de las reseñas verificadas (script.js): solo aparece con 3 o más -->
+            <a href="resenas.html" class="rating-badge" id="ratingBadge" hidden></a>
         </header>
+
+        <!-- Cómo funciona, en tres pasos -->
+        <ol class="how-steps" aria-label="Cómo funciona">
+            <li><span class="how-num">1</span><span><strong>Reserva</strong> de lunes a viernes</span></li>
+            <li><span class="how-num">2</span><span><strong>Horneamos</strong> el domingo</span></li>
+            <li><span class="how-num">3</span><span><strong>Recógelo</strong> o te lo llevamos</span></li>
+        </ol>
 
         <div id="installSlot"></div>
 
@@ -88,8 +109,8 @@
                 <div class="product-card" data-card="clasico">
                     <div class="product-main">
                         <picture class="product-photo">
-                            <source srcset="img/clasico.webp?v=2.8.1" type="image/webp">
-                            <img src="img/clasico.jpg?v=2.8.1" alt="Dos pandebonos clásicos recién horneados" width="480" height="480" loading="eager" decoding="async">
+                            <source srcset="img/clasico.webp?v=3.0.0" type="image/webp">
+                            <img src="img/clasico.jpg?v=3.0.0" alt="Dos pandebonos clásicos recién horneados" width="480" height="480" loading="eager" decoding="async">
                         </picture>
                         <div class="product-info">
                             <h3>Clásico</h3>
@@ -108,8 +129,8 @@
                 <div class="product-card" data-card="bocadillo">
                     <div class="product-main">
                         <picture class="product-photo">
-                            <source srcset="img/bocadillo.webp?v=2.8.1" type="image/webp">
-                            <img src="img/bocadillo.jpg?v=2.8.1" alt="Dos pandebonos abiertos con su relleno de bocadillo de guayaba" width="480" height="480" loading="eager" decoding="async">
+                            <source srcset="img/bocadillo.webp?v=3.0.0" type="image/webp">
+                            <img src="img/bocadillo.jpg?v=3.0.0" alt="Dos pandebonos abiertos con su relleno de bocadillo de guayaba" width="480" height="480" loading="eager" decoding="async">
                         </picture>
                         <div class="product-info">
                             <h3>Con Bocadillo</h3>
@@ -267,6 +288,6 @@
         <button type="button" class="btn btn-link" id="orderDoneClose">Hacer otro pedido</button>
     </dialog>
 
-    <script type="module" src="script.js?v=2.8.1"></script>
+    <script type="module" src="script.js?v=3.0.0"></script>
 </body>
 </html>
