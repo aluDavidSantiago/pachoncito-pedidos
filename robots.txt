@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin.html
+Disallow: /cuenta.html
+Disallow: /seguimiento.html
+
+Sitemap: https://pachoncito.es/sitemap.xml

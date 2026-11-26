@@ -585,6 +585,9 @@ function orderCard(order) {
             disabled: isClosed || key === order.status,
             onClick: event => changeStatus(order, key, event.currentTarget)
         }, info.action)),
+        order.phoneKey
+            ? el('a', { className: 'btn btn-small btn-whatsapp', href: whatsappLink(order), target: '_blank', rel: 'noopener' }, icon('whatsapp'), 'WhatsApp')
+            : null,
         el('button', {
             type: 'button',
             className: 'btn btn-small btn-danger',
@@ -602,6 +605,49 @@ function orderCard(order) {
         el('span', { className: `badge-status ${status.className}`, text: status.text })
     );
 }
+
+// Mensaje de WhatsApp ya escrito según el estado del pedido (se abre la conversación con el cliente)
+function whatsappLink(order) {
+    const name = (order.customerName || '').split(' ')[0];
+    const slot = order.deliverySlot || '';
+    const home = order.deliveryMethod === 'domicilio';
+    const text = {
+        pending: `Hola ${name}, soy Pachoncito 👋 Tenemos tu pedido apuntado para el domingo a las ${slot}. ¡Gracias por confiar en nosotros!`,
+        preparing: `Hola ${name}, tu pedido de Pachoncito ya está en el horno 🔥`,
+        ready: home ? `Hola ${name}, tu pedido de Pachoncito está listo y sale enseguida hacia tu casa 🚗` : `Hola ${name}, tu pedido de Pachoncito ya está listo: puedes pasar a recogerlo cuando quieras 🥖`,
+        delivering: `Hola ${name}, voy de camino con tu pedido de Pachoncito 🚗 Puedes seguirme aquí: https://pachoncito.es/seguimiento.html?pedido=${encodeURIComponent(order.id)}`,
+        completed: `¡Gracias, ${name}! Esperamos que disfrutes tus pandebonos. Si te apetece, déjanos tu opinión y te regalamos una ñapa: https://pachoncito.es/resenas.html`,
+        rejected: `Hola ${name}, soy Pachoncito. Te escribo por tu pedido del domingo a las ${slot}.`
+    }[order.status] || `Hola ${name}, soy Pachoncito.`;
+    return `https://wa.me/${order.phoneKey.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`;
+}
+
+// Hoja del domingo para imprimir: todos los pedidos (no cancelados) por hora, con lo que hay que preparar
+function printSheet() {
+    const list = ordersOfSunday().filter(o => o.status !== 'rejected')
+        .sort((a, b) => (a.deliverySlot || '').localeCompare(b.deliverySlot || '') || (a.customerName || '').localeCompare(b.customerName || ''));
+    const p = productionOf(list);
+    const sheet = $('printSheet');
+    sheet.replaceChildren(
+        el('h1', { text: `Pachoncito · ${sundayLabel(filters.sunday === 'all' ? currentSundayKey() : filters.sunday)}` }),
+        el('p', { text: `${list.length} pedidos · ${p.clasicos} clásicos · ${p.bocadillos} con bocadillo · ${p.napas} ñapas · ${p.units} pandebonos en total · ${formatEUR(p.ingresosCents)}` }),
+        el('table', {},
+            el('thead', {}, el('tr', {}, ['Hora', 'Cliente', 'Teléfono', 'Clás.', 'Boc.', 'Ñapas', 'Entrega', 'Total', '✓'].map(h => el('th', { text: h })))),
+            el('tbody', {}, list.map(o => el('tr', {},
+                el('td', { text: o.deliverySlot || '—' }),
+                el('td', { text: o.customerName || '' }),
+                el('td', { text: o.phone || '' }),
+                el('td', { text: String((o.items?.clasico || 0) + (o.welcomeGift ? 1 : 0)) + (o.welcomeGift ? ' (+1 regalo)' : '') }),
+                el('td', { text: String(o.items?.bocadillo || 0) }),
+                el('td', { text: String(o.napaCount + (orderCredits.get(o.id) || 0)) }),
+                el('td', { text: o.deliveryMethod === 'domicilio' ? o.address : 'Recogida' }),
+                el('td', { text: formatEUR(o.totalCents) }),
+                el('td', { text: '☐' })))))
+    );
+    window.print();
+}
+
+$('printSheetBtn').addEventListener('click', printSheet);
 
 function renderOrders() {
     const searched = ordersOfSunday().filter(matchesSearch);

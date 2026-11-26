@@ -1,4 +1,4 @@
-import { collection, getDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, getDoc, getDocs, limit, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { composeAddress, mountAddressPicker, splitAddress } from "./address.js";
 import { mountEnvBanner } from "./env.js";
 import { mountFaq } from "./faq.js";
@@ -488,7 +488,24 @@ if (!guest && !session.isTest && !validateMobile(profile.phone).phone) {
     showMessage(message, 'El teléfono vinculado a tu cuenta no es un móvil español válido. Escríbenos por Instagram para corregirlo y poder reservar.', 'error');
 }
 watchStore(db, renderStore);
+loadRating();
 watchOvenLoad(db, ovenDay, load => { ovenLoad = load; renderSlots(); });
 napasAvailable = availableNapas(await refreshWelcome());
 napasToRedeem = napasAvailable;
 renderNapaRedeem();
+
+// Nota media de las reseñas verificadas en la cabecera (confianza para quien llega nuevo). Con menos de 3, no se muestra.
+async function loadRating() {
+    try {
+        const snap = await getDocs(query(collection(db, 'reviews'), where('test', '==', false), limit(100)));
+        const reviews = snap.docs.map(d => d.data()).filter(r => r.ratings);
+        if (reviews.length < 3) return;
+        const avg = reviews.reduce((sum, r) => sum + ((r.ratings.producto || 0) + (r.ratings.entrega || 0) + (r.ratings.atencion || 0)) / 3, 0) / reviews.length;
+        const badge = $('ratingBadge');
+        badge.textContent = `★ ${avg.toFixed(1).replace('.', ',')} · ${reviews.length} reseñas de clientes`;
+        badge.setAttribute('aria-label', `Nota media ${avg.toFixed(1)} de 5 en ${reviews.length} reseñas. Ver reseñas`);
+        badge.hidden = false;
+    } catch (error) {
+        console.warn('No se pudieron leer las reseñas:', error);
+    }
+}
