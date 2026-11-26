@@ -6,7 +6,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import {
-    biometricAvailable, biometricErrorMessage, biometricLabel, biometricOfferDeclined, declineBiometricOffer,
+    biometricAvailable, biometricErrorMessage, biometricLabel, biometricOfferDeclined, clearBiometricDecline, declineBiometricOffer,
     enrollBiometric, forgetBiometric, getEnrollment, isUnlocked, lockPanel, markUnlocked, verifyBiometric
 } from "./admin-biometric.js";
 import {
@@ -163,11 +163,20 @@ $('biometricLoginBtn').addEventListener('click', async event => {
         showMessage($('lockMessage'), '');
         enterDashboard(user);
     } catch (error) {
+        if (error?.name !== 'AbortError') biometricFailed = true;
         showMessage($('lockMessage'), biometricErrorMessage(error), 'error');
     }
 });
 
+// Si Face ID ha fallado (p. ej. el iPhone no encuentra la llave), al entrar con contraseña se olvida la
+// llave de este dispositivo y se vuelve a ofrecer activarlo: la nueva se guarda en el llavero.
+let biometricFailed = false;
 $('usePasswordBtn').addEventListener('click', () => {
+    if (biometricFailed) {
+        forgetBiometric();
+        clearBiometricDecline();
+        biometricFailed = false;
+    }
     lockPanel();
     signOut(adminAuth); // cierra la sesión guardada: se vuelve a entrar con contraseña
 });
